@@ -1,0 +1,20 @@
+{
+  "name": "zfs-play",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "build:ui": "node scripts/build-ui.mjs",
+    "build": "npm run build:wasm && npm run build:ui",
+    "dev": "npm run build && node scripts/serve.mjs",
+    "play": "npm run build:ui && node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "@lichess-org/chessground": "10.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

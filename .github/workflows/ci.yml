@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: viewer/package-lock.json
+
+      - name: Install Emscripten
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes emscripten
+
+      - name: Rebuild browser artifacts
+        working-directory: viewer
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build release
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+
+      - name: Test release
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Build with sanitizers
+        run: |
+          cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug \
+            -DZFS_BUILD_TOOLS=OFF -DZFS_ENABLE_SANITIZERS=ON
+          cmake --build build-sanitize --parallel
+
+      - name: Test with sanitizers
+        run: ctest --test-dir build-sanitize --output-on-failure

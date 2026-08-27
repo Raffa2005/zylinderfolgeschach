@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171614" />
+    <title>ZFS Play</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Zylinderfolgeschach</p>
+          <h1>ZFS Play</h1>
+        </div>
+        <p class="intro">
+          Play against the local C++ engine while the browser shows every legal
+          destination and the active follow field.
+        </p>
+      </header>
+
+      <section class="workspace" aria-label="ZFS board and controls">
+        <div class="board-column">
+          <div class="board-frame">
+            <span class="seam seam-left" aria-hidden="true">↔</span>
+            <div id="board" class="board" aria-label="Chess board"></div>
+            <span class="seam seam-right" aria-hidden="true">↔</span>
+          </div>
+          <div class="board-actions">
+            <button id="back" type="button" aria-keyshortcuts="ArrowLeft"
+                    title="Previous move (Left arrow)">
+              ← Back
+            </button>
+            <button id="forward" type="button" aria-keyshortcuts="ArrowRight"
+                    title="Next move (Right arrow)">
+              Forward →
+            </button>
+            <button id="reset" type="button">New game</button>
+            <button id="flip" type="button">Flip board</button>
+          </div>
+          <p class="keyboard-hint">Use ← and → to navigate the move line</p>
+        </div>
+
+        <aside class="panel">
+          <section class="position-card" aria-live="polite">
+            <div class="status-line">
+              <span id="turn-dot" class="turn-dot"></span>
+              <strong id="status">Loading rules…</strong>
+            </div>
+            <div id="badges" class="badges"></div>
+          </section>
+
+          <section class="engine-card">
+            <div class="label-row">
+              <h2>Play against engine</h2>
+              <span id="engine-connection" class="connection">Connecting…</span>
+            </div>
+            <div class="engine-options">
+              <label>
+                Your side
+                <select id="human-color">
+                  <option value="white">White</option>
+                  <option value="black">Black</option>
+                </select>
+              </label>
+              <label>
+                Depth
+                <input id="engine-depth" type="number" min="1" max="100"
+                       step="1" value="10" inputmode="numeric" />
+              </label>
+            </div>
+            <button id="engine-toggle" class="primary" type="button" disabled>
+              Play from this position
+            </button>
+            <div class="engine-readout" aria-live="polite">
+              <strong id="engine-status">Waiting for engine service</strong>
+              <div class="engine-metrics">
+                <span id="engine-score">—</span>
+                <span id="engine-depth-readout">Depth —</span>
+                <span id="engine-nodes">— nodes</span>
+              </div>
+              <p id="engine-pv" class="engine-pv">No analysis yet</p>
+            </div>
+          </section>
+
+          <section>
+            <div class="label-row">
+              <h2>Legal moves</h2>
+              <span id="move-count" class="count">0</span>
+            </div>
+            <div id="legal-moves" class="move-list"></div>
+          </section>
+
+          <section>
+            <details class="position-tools">
+              <summary>Position tools</summary>
+              <div class="label-row fen-label">
+                <label for="fen">ZFS-FEN</label>
+                <button id="copy-fen" class="text-button" type="button">
+                  Copy
+                </button>
+              </div>
+              <textarea id="fen" rows="3" spellcheck="false"></textarea>
+              <button id="load-fen" class="primary" type="button">
+                Load position
+              </button>
+            </details>
+            <p id="error" class="error" role="alert"></p>
+          </section>
+
+          <section>
+            <div class="label-row">
+              <h2>Played moves</h2>
+              <span id="ply-count" class="count">0</span>
+            </div>
+            <div id="history" class="history empty">No moves yet</div>
+            <p class="history-note">
+              Threefold repetition and 50 moves are automatic draws.
+            </p>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <dialog id="promotion-dialog">
+      <form method="dialog">
+        <h2>Choose promotion</h2>
+        <div id="promotion-choices" class="promotion-choices"></div>
+        <button value="cancel" class="text-button">Cancel</button>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+/build*/
+/viewer/dist/
+/viewer/node_modules/
+/viewer/src/generated/*.js
+/viewer/src/generated/*.wasm
