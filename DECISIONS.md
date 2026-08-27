@@ -422,3 +422,72 @@ and their consequences, not the code line by line.
     material, SEE, null move, LMR, and futility remain candidates, not assumed
     wins; the selective techniques need variant-specific tactical tests before
     they may change which branches are searched.
+
+## Change evaluation
+
+55. **Correctness, work, and strength are separate gates.** The existing rules,
+    differential, search, UCI, and browser tests remain the correctness gate. A
+    twelve-position deterministic benchmark reports both nodes and time and
+    hashes scores, best moves, node counts, and PVs into a behavior signature.
+    Paired self-play alone answers the strength question. No one metric is used
+    as a substitute for the other two.
+
+56. **The match process, not either engine, adjudicates games.** Both UCI engines
+    merely propose moves. A fresh production `Game` replays the full opening and
+    validates every reply, then applies automatic threefold and 50-move draws,
+    checkmate, and stalemate. Illegal moves, crashes, and hard timeouts forfeit.
+    Eval-based resignation/draw rules were excluded. The only artificial rule is
+    a recorded safety ply cap, checked after real terminal rules.
+
+57. **Experiments use complete-history paired openings.** A suite line is a move
+    sequence from `startpos`, not a FEN, because repetition and follow state are
+    history-sensitive. Each line is played with candidate colors swapped and
+    enters one of five pair bins. The bundled screen and holdout books use fixed
+    seeds and reject terminal, checked, materially unequal, or duplicate final
+    states. They bootstrap testing; they are not represented as an
+    optimal-opening corpus.
+
+58. **The sequential test uses pentanomial logistic GSPRT.** The five paired
+    bins retain within-pair color correlation. The likelihood implementation
+    follows Fishtest's constrained multinomial maximum-likelihood calculation
+    and its 0.001 prior for empty bins. Logistic Elo is named explicitly;
+    normalized Elo is not approximated or silently conflated with it. Decisions
+    occur only on pair boundaries at configured alpha/beta bounds.
+
+59. **Runs are reproducible and resumable without infrastructure.** One
+    checksummed JSONL manifest fingerprints the runner and both engine binaries,
+    the opening file, exact limits, hypothesis parameters, canonical paths,
+    optional revision IDs, and engine names. Binding the runner image prevents
+    one log from mixing referee or statistical semantics across rebuilds.
+    Existing files are never overwritten. Resume requires the same fingerprint
+    and counts only contiguous, internally consistent, checksummed pair records;
+    unknown or corrupt complete records are rejected. Both games live in one
+    record. Only unterminated final-record bytes are discarded, and that entire
+    pair is replayed. An exclusive advisory lock prevents cooperating local
+    runners from resuming the same unchanged path. Renaming or replacing the log
+    during a run is explicitly outside that contract. Result descriptors close
+    across exec. Engine input is nonblocking and command writes share the
+    response deadline, so an engine
+    that stops consuming input cannot wedge the runner; timed-out engine process
+    groups are killed as a unit. Host pipe/fork/process-isolation failures abort
+    the experiment rather than being misreported as a color-dependent forfeit.
+    Opening bytes are loaded once, so the validated lines and their fingerprint
+    cannot diverge. Engine binaries run from their canonical paths, preserving
+    executable-relative libraries and resources. Their content is fingerprinted
+    initially; cheap file-identity checks around launches and pair commits catch
+    replacement without repeatedly scanning a large executable. Runtime-loaded
+    models, libraries, and configs
+    cannot be discovered generically; the optional candidate/baseline IDs bind a
+    caller-supplied immutable deployment identity for those cases. There is one
+    local worker; no scheduler, database, dashboard, or distributed protocol was
+    built.
+
+60. **Fixed nodes and fixed movetime answer different questions.** Fixed nodes
+    reduce noise when comparing search efficiency and ordering. Fixed movetime
+    covers timing and stop behavior but inherits host noise. Every game starts
+    fresh engine processes, preventing state leakage across colors at the cost
+    of irrelevant process-start overhead outside the move budget. `Hash` is set
+    to the same requested size when advertised by the engine; an out-of-range
+    request is rejected explicitly. Unsupported UCI options are never sent, and
+    support is recorded in the manifest. Explicit `Clear Hash` is redundant
+    because the process is new.

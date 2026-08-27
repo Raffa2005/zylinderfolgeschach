@@ -37,7 +37,7 @@ For an AddressSanitizer and UndefinedBehaviorSanitizer run:
 
 ```sh
 cmake -S . -B build-sanitize -DCMAKE_BUILD_TYPE=Debug \
-  -DZFS_BUILD_TOOLS=OFF -DZFS_ENABLE_SANITIZERS=ON
+  -DZFS_ENABLE_SANITIZERS=ON
 cmake --build build-sanitize -j
 ctest --test-dir build-sanitize --output-on-failure
 ```
@@ -85,6 +85,24 @@ The perft utility accepts a positive depth and an optional seven-field ZFS-FEN:
 ./build/zfs_perft 6
 ./build/zfs_perft 3 '4k3/8/8/8/8/8/8/4K2R w K - 0 1 -'
 ```
+
+## Evaluating engine changes
+
+The repository includes a deterministic search benchmark, reproducible opening
+generator, trusted-rules paired UCI match runner, append-only/resumable result
+logs, and pentanomial logistic-GSPRT reporting. A minimal comparison is:
+
+```sh
+./build/zfs_bench
+./build/zfs_match --candidate /path/to/new/zfs_engine \
+  --baseline /path/to/old/zfs_engine \
+  --openings openings/screen-v1.txt --output run.jsonl \
+  --nodes 25000 --pairs 32
+```
+
+See [EVALUATION.md](EVALUATION.md) for the workflow, statistical interpretation,
+fixed-time mode, committed screen/holdout suites, and reproducibility contract.
+The match runner is currently POSIX-only and intentionally sequential.
 
 ## Core API
 

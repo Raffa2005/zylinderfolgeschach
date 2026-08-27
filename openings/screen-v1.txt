@@ -1,0 +1,33 @@
+# zfs-openings-v1 seed=6510615555426900570 min_plies=8 max_plies=16
+b2b3 g7g6 e2e3 g6g5 c2c3 d7d5 g1f3 c8d7 h2h3 d7g4 e3e4
+e2e4 c7c6 f1a6 f7f6 a6d3 a7a6 e1f1 e8f7
+b1a3 f7f6 g2g4 e8f7 a3g2 a7a6 e2e4 b7b6 g2e3 b6b5
+a2a3 b7b6 b2b3 d7d5 g1h3 c8e6 h3b4 e6h3 b4d3 h7h5 d3c5 g8f6
+c2c3 b8c6 h2h3 d7d6 b1a3 c6b4 e2e4 b4d5 b2b4 d8d7
+g2g3 h7h6 f2f4 b7b6 a2a3 c8g4 g1a2 g4h3 g3g4
+g2g3 f7f6 b2b3 b7b6 d2d4 a7a5 c1a7 c8b7 d1d3 g7g6 b1d2 c7c6 a7e3
+b2b4 f7f5 e2e3 e7e6 c1e7 d7d6 g1h3 b8c6 e7f6
+h2h4 d7d6 g1f3 g8f6 c2c3 c8h3 d1c2 f6e4
+g1h3 a7a6 d2d3 g7g6 b1c3 c7c6 g2g4 a6a5 c1e3 a5a4 h3a5 c6c5 a5c6 d8a5 c6d8
+b1c3 c7c5 b2b3 h7h6 g1h3 e7e6 c1e7 d8g3 e7d8 g8e7 c3a4 g3c3 d8g3 e7f5
+g1h3 b7b5 e2e4 c8e2 h3a5 e2c4 d1e2 c4b3 a5c4 a7a5 e2e3 a8a7 c4a3
+g1h3 f7f6 c2c4 g7g6 b2b3 c7c5 d1c2 e7e6 c2c3 f8h6 c1h4 g8e7 e1d1 d8b6
+b2b4 f7f6 h2h3 h7h5 c1g5 b8h7 d2d4 d7d5 f2f3 b7b6 a2a4
+h2h4 a7a6 b1h2 d7d6 a1b1 c8g4 e2e4 g4e2 g2g4 c7c6 f2f3 a8a7 g1h3 e8d7 g4g5 e7e5
+b2b4 b8c6 h2h3 f7f6 c1a3 h7h6 a3h2 c6d4 h2e5 e7e6 e5h2 e6e5 d2d3 d7d6 f2f4
+h2h4 e7e6 d2d3 e6e5 c1d2 h7h6 b1c3 f7f6 d3d4 h8h7
+g1f3 g8f6 h2h3 b7b6 f3h2 c8f3 c2c4 f3b7 f2f3 f6g4 b2b4 g4e3 h2g4
+b2b4 g7g6 c2c4 h7h5 d1b3 g8h6 f2f4 d7d6 e1f2
+f2f3 h7h5 g2g3 b8c6 h2h4 a7a6 c2c4 c6b8 f1c6 g7g5 b2b4 h8h6 c1b2
+h2h3 d7d6 c2c3 b7b5 a2a3 d6d5 a1a2 c8h5 c3c4 h5a4 d2d3
+f2f4 e7e6 g2g3 d8e7 f1b5 g8h6 b5a6 h6b5
+h2h4 h7h5 b1c3 d7d6 g2g4 c7c6 f1h3 g7g6 d2d4
+a2a4 g8h6 d2d4 b7b6 e1d2 c8f3 g1h3 e7e5 d2e1 f7f6 b2b4 g7g5 c1f4 h6f7
+b2b3 c7c5 g2g3 b8c6 f2f4 c6d4 f1c6 b7b5 c6b7 d4c6 d2d4 g7g5 b3b4
+b2b4 c7c5 c1b2 g7g6 b2g7 a7a6 e2e4 h7h5 g1f3 g8f6 f3e5 d7d6 e5d7
+h2h3 e7e5 h1h2 h7h6 b2b3 d8b2 c2c4 b2c2 c1b2 c2c1 b2c3 c1b2 d1c1 b8c6
+b1a3 c7c6 a1b1 g7g6 h2h3 d8b6 a3b5 b6a6
+f2f3 b8a6 h2h3 f7f5 g2g3 h7h5 e2e3 c7c6 c2c3 g7g6
+f2f4 c7c6 g2g3 d8h4 g1h3 a7a5 d2d4 h4a4 h3g1 a4h3 a2a4 h3a2 h2h3 a2h2
+g2g3 a7a5 h2h3 f7f6 d2d4 h7h6 f2f3 d7d5 b2b4 b7b5 e2e4
+f2f3 b8c6 h2h3 c6b8 h1h2 h7h5 c2c4 c7c5 g2g3

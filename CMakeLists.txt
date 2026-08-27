@@ -57,9 +57,50 @@ if(ZFS_ENABLE_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         -fno-sanitize-recover=undefined)
 endif()
 
+if(ZFS_BUILD_TOOLS OR ZFS_BUILD_TESTS)
+    add_library(zfs_eval_support
+        tools/eval/openings.cpp
+        tools/eval/stats.cpp
+    )
+    target_include_directories(zfs_eval_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(zfs_eval_support PUBLIC zfs)
+    target_compile_features(zfs_eval_support PUBLIC cxx_std_20)
+    target_compile_options(zfs_eval_support PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+    )
+endif()
+
 if(ZFS_BUILD_TOOLS)
     add_executable(zfs_perft tools/perft.cpp)
     target_link_libraries(zfs_perft PRIVATE zfs)
+
+    add_executable(zfs_openings tools/openings.cpp)
+    target_link_libraries(zfs_openings PRIVATE zfs_eval_support)
+    target_compile_options(zfs_openings PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+    )
+
+    add_executable(zfs_stats tools/stats.cpp)
+    target_link_libraries(zfs_stats PRIVATE zfs_eval_support)
+    target_compile_options(zfs_stats PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+    )
+
+    if(ZFS_BUILD_ENGINE)
+        add_executable(zfs_bench tools/bench.cpp)
+        target_link_libraries(zfs_bench PRIVATE zfs_search)
+        target_compile_options(zfs_bench PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+        )
+    endif()
+
+    if(UNIX)
+        add_executable(zfs_match tools/match.cpp)
+        target_link_libraries(zfs_match PRIVATE zfs_eval_support)
+        target_compile_options(zfs_match PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+        )
+    endif()
 endif()
 
 if(ZFS_BUILD_TESTS)
@@ -93,6 +134,24 @@ if(ZFS_BUILD_TESTS)
     target_link_libraries(zfs_game_tests PRIVATE zfs)
     add_test(NAME zfs_game_tests COMMAND zfs_game_tests)
 
+    add_executable(zfs_evaluation_tests tests/evaluation_tests.cpp)
+    target_link_libraries(zfs_evaluation_tests PRIVATE zfs_eval_support)
+    target_compile_definitions(zfs_evaluation_tests PRIVATE
+        ZFS_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME zfs_evaluation_tests COMMAND zfs_evaluation_tests)
+
+    if(UNIX)
+        add_executable(zfs_nonblocking_io_tests tests/nonblocking_io_tests.cpp)
+        target_include_directories(zfs_nonblocking_io_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_features(zfs_nonblocking_io_tests PRIVATE cxx_std_20)
+        target_compile_options(zfs_nonblocking_io_tests PRIVATE
+            $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic;-Wconversion;-Wshadow>
+        )
+        add_test(NAME zfs_nonblocking_io_tests COMMAND zfs_nonblocking_io_tests)
+        set_tests_properties(zfs_nonblocking_io_tests PROPERTIES TIMEOUT 5)
+    endif()
+
     if(ZFS_BUILD_ENGINE)
         add_executable(zfs_search_tests tests/search_tests.cpp)
         target_link_libraries(zfs_search_tests PRIVATE zfs_search)
@@ -103,6 +162,13 @@ if(ZFS_BUILD_TESTS)
                 COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_smoke.sh
                         $<TARGET_FILE:zfs_engine>)
             set_tests_properties(zfs_uci_smoke PROPERTIES TIMEOUT 30)
+
+            if(ZFS_BUILD_TOOLS)
+                add_test(NAME zfs_match_smoke
+                    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/match_smoke.sh
+                            $<TARGET_FILE:zfs_match> $<TARGET_FILE:zfs_engine>)
+                set_tests_properties(zfs_match_smoke PROPERTIES TIMEOUT 30)
+            endif()
         endif()
 
         add_test(NAME zfs_viewer_engine_service
