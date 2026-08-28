@@ -14,6 +14,9 @@ The JSONL ledger is authoritative.
 | `lmr-r1-zfs-guarded` | rejected | 4,049,790 | 1,409 ms | 64 |
 | `lmr-r1-late7-d5` | accepted | 4,201,814 | 1,448 ms | 128 |
 | `qsearch-exact-tactical-gen` | accepted | 4,201,814 | 1,112 ms | 128 |
+| bishop 360 | deferred | 4,199,466 | 1,115 ms | 96 |
+| bishop 390 | rejected | — | — | 32 |
+| `qsearch-tt-r1` | rejected | 3,274,584 | 945 ms | 128 |
 
 ## `null-verified-r2`: rejected
 
@@ -123,3 +126,26 @@ Fixed-depth behavior is identical: both champion #2 and the candidate search
 sequential boundary; promotion rests primarily on the exact semantic oracle and
 repeatable throughput gain, with self-play providing a compatible positive
 signal.
+
+## Cylindrical bishop value: no promotion
+
+Raising the bishop from 330 to 360 centipawns produced a positive 16-pair
+smoke but an exactly neutral independent 32-pair confirmation. Raising it
+further to 390 was weaker on the same smoke and increased the depth-8 tree by
+4.45%. The geometric prior that cylinder bishops are worth more remains
+plausible, but the measurements are neither monotonic nor strong enough to
+change the evaluator. The conventional 330 value remains in the champion.
+
+## Quiescence TT: rejected
+
+A separately keyed qsearch TT encoded the synthetic-null domain and remaining
+q-ply budget, and probed only after repetition, terminal, rule-50, and horizon
+checks. Full lower/upper/exact bounds reduced depth-9 nodes by 22.06% and time
+by about 15.7%, but scored -10.86 and -5.43 Elo point in independent 32-pair
+screens (roughly -8.15 aggregate). The shared table's shallow bounds saved
+work but consistently cost strength.
+
+An exact-bound-only salvage saved just 550 of 4,201,814 nodes (0.013%) and was
+slower, so it was rejected before self-play. Both implementations were removed;
+the useful qsearch optimization remains exact tactical move generation without
+TT storage.
