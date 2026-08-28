@@ -52,6 +52,8 @@ working tree:
 
 ```sh
 ./tools/autoresearch.py run --name null-r2 --core 12
+./tools/autoresearch.py run --name null-r2-time --core 12 \
+  --movetime-ms 20 --pairs 32
 ./tools/autoresearch.py decide --name null-r2 --decision accept \
   --reason "passed confirmation threshold"
 ```

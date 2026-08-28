@@ -227,6 +227,8 @@ def validate_run_arguments(args: argparse.Namespace) -> None:
         raise ExperimentError("benchmark limits are outside the safety range")
     if not 1 <= args.pairs <= 4096 or not 1 <= args.nodes <= 10_000_000:
         raise ExperimentError("match limits are outside the safety range")
+    if not 0 <= args.movetime_ms <= 60_000:
+        raise ExperimentError("--movetime-ms is outside the safety range")
     if not 1 <= args.hash_mb <= 1024 or not 1 <= args.max_plies <= 10_000:
         raise ExperimentError("hash or ply limit is outside the safety range")
     if args.core >= (os.cpu_count() or 1):
@@ -264,6 +266,7 @@ def run_experiment(args: argparse.Namespace) -> int:
             "bench_runs": args.bench_runs,
             "openings": str(openings.relative_to(root)),
             "nodes": args.nodes,
+            "movetime_ms": args.movetime_ms,
             "pairs": args.pairs,
             "hash_mb": args.hash_mb,
             "max_plies": args.max_plies,
@@ -329,6 +332,10 @@ def run_experiment(args: argparse.Namespace) -> int:
             "reference_engine_sha256": sha256_file(baseline_engine),
             "candidate_engine_sha256": sha256_file(candidate_engine),
         }
+        search_limit = (
+            ["--movetime-ms", str(args.movetime_ms)]
+            if args.movetime_ms > 0 else ["--nodes", str(args.nodes)]
+        )
         match_command = affinity(
             [
                 str(runner),
@@ -344,8 +351,7 @@ def run_experiment(args: argparse.Namespace) -> int:
                 str(openings),
                 "--output",
                 str(match_path),
-                "--nodes",
-                str(args.nodes),
+                *search_limit,
                 "--pairs",
                 str(args.pairs),
                 "--hash-mb",
@@ -412,6 +418,7 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--bench-depth", type=int, default=9)
     run_parser.add_argument("--bench-runs", type=int, default=4)
     run_parser.add_argument("--nodes", type=int, default=10_000)
+    run_parser.add_argument("--movetime-ms", type=int, default=0)
     run_parser.add_argument("--pairs", type=int, default=32)
     run_parser.add_argument("--hash-mb", type=int, default=16)
     run_parser.add_argument("--max-plies", type=int, default=256)
