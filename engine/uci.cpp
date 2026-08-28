@@ -113,8 +113,8 @@ public:
             } else if (command == "d") {
                 send("info string " + game_.position().to_fen());
             } else if (command == "eval") {
-                send("info string material evaluation " +
-                     std::to_string(evaluate_material(game_.position())) +
+                send("info string static evaluation " +
+                     std::to_string(evaluate(game_.position())) +
                      " cp for side to move");
             } else if (command == "ponderhit") {
                 pondering_.store(false, std::memory_order_relaxed);

@@ -47,7 +47,8 @@ ctest --test-dir build-sanitize --output-on-failure
 
 `zfs_engine` identifies itself as **Kugelfisch** over UCI. It is a deterministic,
 single-search-worker engine with principal-variation alpha-beta search and
-material-only evaluation:
+an evaluation built from conventional material plus ZFS leader/follower
+initiative:
 
 ```sh
 ./build/zfs_engine

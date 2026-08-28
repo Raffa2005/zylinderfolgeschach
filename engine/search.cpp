@@ -504,7 +504,7 @@ private:
         }
         buffers_->pv_length[ply] = 0;
         if (ply >= kMaximumPly - 1) {
-            return evaluate_material(position_);
+            return evaluate(position_);
         }
 
         if (!synthetic_path && is_search_repetition(ply)) {
@@ -523,12 +523,12 @@ private:
         const int qply_limit = std::clamp(limits_.quiescence_plies, 0,
                                           kMaximumQuiescencePlies);
         if (qply >= qply_limit) {
-            return evaluate_material(position_);
+            return evaluate(position_);
         }
 
         int best = -kInfinity;
         if (!move_info.all_moves_required) {
-            best = evaluate_material(position_);
+            best = evaluate(position_);
             if (best >= beta) {
                 return best;
             }
@@ -575,7 +575,7 @@ private:
         }
         buffers_->pv_length[ply] = 0;
         if (ply >= kMaximumPly - 1) {
-            return evaluate_material(position_);
+            return evaluate(position_);
         }
 
         if (!synthetic_path && is_search_repetition(ply)) {
@@ -622,7 +622,7 @@ private:
             !position_.in_check(position_.side_to_move()) &&
             !(valid_square(position_.follow_square()) &&
               moves[0].to() == position_.follow_square()) &&
-            evaluate_material(position_) >= beta) {
+            evaluate(position_) >= beta) {
             const int reduction = 2 + depth / 5;
             NullUndo undo;
             make_null_move(ply, undo);

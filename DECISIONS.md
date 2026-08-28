@@ -562,3 +562,55 @@ and their consequences, not the code line by line.
     The browser loads the whole line and rewinds it, so existing arrow and move
     navigation inspect exact historical follow state. A user move intentionally
     branches from and leaves archive mode; the recorded game is never mutated.
+
+## Second autoresearch cycle
+
+69. **Evaluation distinguishes mobility from opponent-controlled mobility.**
+    Conventional material remains the base, but the side to move receives
+    leader initiative when an opponent could enter a piece's vacated square.
+    Generic pseudo-mobility was tested separately, was nearly neutral, and cost
+    about 10.9 percent at fixed depth. It was removed. The accepted signal is
+    specifically the right to choose the path while making the opponent follow,
+    not a blanket preference for more destinations.
+
+70. **Leader initiative charges the cheapest prospective follower.** The
+    compelled player may choose among all legal followers, so summing attackers
+    would exaggerate the burden. Base charges are approximately one sixteenth
+    of follower material value. Movement-compatible followers that may sustain
+    the chase—knight/knight, bishop/bishop-or-queen, rook/rook-or-queen, and
+    queen/queen—receive a factor of two. The least-cost type order is generated
+    at compile time from those coefficients, avoiding a second hand-maintained
+    table.
+
+71. **The horizon term is deliberately pseudo-legal, with known impossibilities
+    excluded explicitly.** Pawn pushes include clear double-push transit and
+    exclude promotion-rank arrivals. Kings are considered only as followers of
+    pawns, because every non-pawn mover attacks its origin from its destination.
+    Pins, check, and departure legality remain the search's job. Duplicating
+    full legality in an evaluator called at millions of leaves would be both
+    slower and a second rules implementation. Focused tests cover cheapest-
+    follower selection, king inclusion and exclusion, clear double-push transit,
+    promotion exclusion, and relative follower burden.
+
+72. **Evaluation promotion requires longer independent confirmation.** A
+    fourfold sustainable-shadow penalty scored 63.28 percent at 30 ms and then
+    48.44 percent at 100 ms. Thirty milliseconds remains useful for rejecting
+    weak ideas, but no evaluator change is promoted from that signal alone. The
+    accepted leader term scored 57.81 percent at 30 ms and 55.47 percent at 100
+    ms in independent samples, aggregating to 56.64 percent over 64 pairs with a
+    positive 95 percent interval. The rule-refined final form later scored 53.91
+    percent in a separate 100 ms sample; that sample is reported as inconclusive
+    by itself.
+
+73. **Plausible material and placement retunes remain evidence, not code.** A
+    knight rank bonus, knight value 360, queen value 850, generic mobility, and
+    stronger shadow multipliers all failed their work/confirmation gates. They
+    were removed rather than left behind flags. The final material values remain
+    100/320/330/500/900, with only the measured leader/follower term added.
+
+74. **Selective-search tests assert contracts, not accidental full-width
+    equality.** LMR is required to execute only under its explicit guards and
+    to return a legal search result. Requiring its best move and score to equal
+    an unreduced search at one evaluator-dependent start position falsely treats
+    a selective heuristic as exact. Shallow alpha-beta remains compared against
+    exhaustive minimax where exact equality is a valid contract.

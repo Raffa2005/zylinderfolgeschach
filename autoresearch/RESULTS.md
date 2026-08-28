@@ -203,3 +203,59 @@ capacity result is much stronger: depth-9 nodes fell from 11,425,195 to
 1,114 ms (-67.39%). The accepted engine core remains guarded null move,
 conservative LMR, exact tactical qsearch generation, and conventional material
 evaluation—nothing from the rejected experiments remains in the source.
+
+## Second cycle: leader/follower evaluation
+
+Human review supplied the central variant insight: mobility itself can still be
+useful, but allowing an opponent to follow is bad and controlling the sequence
+as leader is good. In particular, movement-compatible followers can shadow a
+knight, bishop, rook, or queen repeatedly while the leader selects destinations
+and harvests material.
+
+The accepted evaluator adds a compact leader-initiative term to conventional
+material. It maps the opponent's pseudo-legal destinations, finds each
+side-to-move piece that could be followed after departure, and scores only the
+least costly follower because the compelled player chooses. Base follower
+burdens are approximately one sixteenth of material value; sustainable
+movement-compatible shadowing doubles the burden. The follower ordering is
+derived at compile time from those coefficients rather than duplicated by hand.
+
+The first implementation was measured independently against champion #3:
+
+| Limit | Pairs | Score | Elo point | 95% CI |
+|---|---:|---:|---:|---:|
+| 30 ms | 32 | 57.81% | +54.74 | [-3.80, +116.56] |
+| 100 ms | 32 | 55.47% | +38.15 | [-7.18, +84.83] |
+| Aggregate | 64 | 56.64% | +46.42 | [+9.59, +84.32] |
+
+A rule-consistency refinement then removed impossible non-pawn king followers
+and pawn follows that would promote on arrival. It was exactly neutral against
+the initial form over 32 pairs and slightly reduced the deterministic tree. The
+exact final stack scored 53.91% (+27.20 Elo point, 95% CI [-10.65, +65.70]) in
+an independent 32-pair, 100 ms match against champion #3. That final sample is
+positive but individually inconclusive; the promotion rests on the repeated
+positive evidence and the aggregate result, not on pretending the widest
+interval is proof.
+
+At depth nine the final evaluator searched 4,076,636 nodes versus champion #3's
+4,201,814 (-2.98%). Its interleaved median time was 1,235 ms versus 1,117.5 ms
+(+10.51%), so the added geometry has a real execution cost despite producing a
+smaller tree.
+
+Rejected branches were removed completely:
+
+- generic pseudo-mobility was nearly neutral on top of leader initiative and
+  added about 10.9% fixed-depth time;
+- multiplying all leader scores by two gained only 10.86 Elo point in a short
+  screen while expanding the tree;
+- a fourfold sustainable-shadow multiplier scored 63.28% at 30 ms but reversed
+  to 48.44% at 100 ms, identifying it as a shallow horizon patch;
+- a threefold multiplier aggregated to 51.95% over two 100 ms samples, not
+  enough to displace the simpler and safer factor of two;
+- a knight rank-centralization proxy scored 49.22% and expanded the tree;
+- knight 360 expanded the tree by 8.73% for only a weak short-screen signal;
+- queen 850 scored 53.12% at 30 ms and exactly 50.00% at 100 ms.
+
+Consequently, 30 ms is retained only as a cheap rejection screen for evaluator
+ideas. Promotion requires independent 100 ms evidence, while fixed-depth work
+and time remain separately reported so evaluation quality cannot hide its cost.

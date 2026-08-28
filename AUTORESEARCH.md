@@ -12,7 +12,8 @@ against a moving previous candidate.
    core. Nodes measure search work; median time measures implementation cost.
 3. Routine tuning uses only `openings/screen-v2.txt`. The holdout is reserved
    for a stack that has already earned promotion.
-4. Strength uses fixed-node, color-swapped pairs with the ZFS-0 match referee.
+4. Strength uses fixed-node or fixed-movetime, color-swapped pairs with the ZFS-0
+   match referee.
    The controller verifies its binary and the opening book against
    `autoresearch/baseline.json`, so candidate code cannot redefine legality or
    adjudication. No NPS or node-count result is called Elo.
@@ -53,7 +54,7 @@ working tree:
 ```sh
 ./tools/autoresearch.py run --name null-r2 --core 12
 ./tools/autoresearch.py run --name null-r2-time --core 12 \
-  --movetime-ms 20 --pairs 32
+  --movetime-ms 100 --pairs 32
 ./tools/autoresearch.py decide --name null-r2 --decision accept \
   --reason "passed confirmation threshold"
 ```
@@ -64,6 +65,13 @@ machine-readable ledger event. It never edits source or automatically declares
 a winner. After the first promotion, `--reference-build` can point at a frozen
 champion artifact while `--baseline-build` continues to provide the immutable
 ZFS-0 referee. Direct champion-versus-ZFS-0 checks report cumulative gain.
+
+Thirty-millisecond matches are only rejection screens for evaluation work.
+Promising terms require an independent 100 ms sample before promotion: a
+fourfold persistent-shadow penalty scored 63.28% at 30 ms and then 48.44% at
+100 ms, exposing a shallow-horizon patch rather than durable strength. Fixed
+nodes remain useful for controlled search-quality comparisons, while fixed-depth
+benchmarks separate changed tree shape from the evaluator's execution cost.
 
 `screen-v2` contains 256 independently generated, color-swapped training lines.
 `screen-v2-confirm` is a separately seeded 128-line training-validation pool.

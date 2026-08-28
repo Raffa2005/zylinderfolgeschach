@@ -1,6 +1,6 @@
 # Kugelfisch engine and roadmap
 
-Status: the first single-worker autoresearch champion described below is
+Status: the second single-worker autoresearch champion described below is
 implemented. Detailed rationales and measured tradeoffs are recorded in
 [DECISIONS.md](DECISIONS.md) and [autoresearch/RESULTS.md](autoresearch/RESULTS.md).
 
@@ -14,7 +14,7 @@ UCI controller thread
 one search worker
   iterative deepening -> PVS/alpha-beta -> exact-subset quiescence
                 |              |                    |
-                |              |                    +-> material-only evaluation
+                |              |                    +-> material + follow initiative
                 |              +-> guarded null move and conservative LMR
                 +-> exact history draws, ordering, history-qualified TT
                 |
@@ -68,21 +68,39 @@ countermove table, or qsearch TT. Those measured candidates either lost strength
 or failed their engineering gate under mandatory follow.
 
 Quiescence searches every legal move when checked or forced to follow. At an
-ordinary choice node it uses material stand pat and searches captures and
+ordinary choice node it uses static-evaluation stand pat and searches captures and
 promotions. Since forced quiet closure can grow without consuming material, the
 initial quiescence horizon is eight plies after terminal and draw checks.
 
 ## Evaluation
 
-Evaluation is conventional material only:
+Evaluation starts with conventional material:
 
 ```text
 pawn 100, knight 320, bishop 330, rook 500, queen 900
 ```
 
-No mobility term is present. In ZFS, mobility may be a liability because it can
-enable an opponent's follow obligation; adding such a term before evidence would
-encode an unsupported strategic belief.
+It then values **leader initiative**. For every side-to-move piece whose vacated
+square an opponent could pseudo-legally enter, it charges the least costly
+available follower, because the compelled side chooses among legal followers.
+The base burdens are approximately one sixteenth of the follower's material
+value. A movement-compatible follower that can keep shadowing the leader—such
+as knight following knight, rook following rook, or queen following either
+slider—costs twice as much. This also captures the queen's special liability:
+it may be forced to follow bishops, rooks, and queens.
+
+Pawn targets include legal push geometry and exclude promotion-rank arrivals,
+which cannot keep following as pawns. A king is a prospective follower only of
+a pawn; every non-pawn mover would attack its own origin after moving, so the
+king could not legally enter it. The term uses pseudo-legal geometry
+deliberately. Exact pins, checks, departure legality, and the resulting
+compulsory move are resolved by search rather than duplicated imperfectly in a
+horizon evaluator.
+
+No generic mobility, piece-square, check, king-pressure, or drawishness term is
+present. Plain mobility and cheap rank-centralization proxies failed their
+screens; the accepted term distinguishes useful freedom to lead from mobility
+controlled by the opponent.
 
 ## UCI surface
 
@@ -113,7 +131,8 @@ starting, so there is never more than one CPU-intensive search.
 - incremental-key restoration and exact auxiliary-state repetition fixtures;
 - automatic threefold/50-move and checkmate-precedence fixtures;
 - alpha-beta comparison with exhaustive shallow minimax;
-- material, mate, root restriction, twofold, determinism, and limit tests;
+- material, leader/follower ordering, mate, root restriction, twofold,
+  determinism, and limit tests;
 - browser bridge draw/navigation tests and execution of the shipped WASM;
 - a check that the distribution embeds that tested WASM payload;
 - a localhost service test covering validation, streamed analysis, a
@@ -125,8 +144,8 @@ starting, so there is never more than one CPU-intensive search.
 
 ## Deliberately later
 
-1. Expand tactical and self-play corpora before adding evaluation terms.
-2. Measure any further variant-safe reductions individually. The first cycle's
+1. Expand tactical and self-play corpora before adding further evaluation terms.
+2. Measure any further variant-safe reductions individually. Earlier cycles'
    rejected heuristics remain evidence, not dormant feature flags.
 3. Design and solve ZFS tablebases through four pieces, including follow and
    auxiliary-state indexing and proven cylinder symmetries.

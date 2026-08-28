@@ -5,5 +5,6 @@
 namespace zfs::engine {
 
 [[nodiscard]] int evaluate_material(const Position& position) noexcept;
+[[nodiscard]] int evaluate(const Position& position) noexcept;
 
 }  // namespace zfs::engine
