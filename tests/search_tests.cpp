@@ -120,6 +120,48 @@ void test_mate_and_material() {
     CHECK(capture.score > 0);
 }
 
+void test_reported_slow_position_is_not_a_proven_mate() {
+    auto position = load(
+        "rnbq2n1/ppppNr2/4k3/5pQ1/4PbP1/2P4p/P4PPP/2R1K2R "
+        "b - - 0 1 g6");
+    CHECK(position.to_fen() ==
+          "rnbq2n1/ppppNr2/4k3/5pQ1/4PbP1/2P4p/P4PPP/2R1K2R "
+          "b - - 0 1 g6");
+    CHECK(position.side_to_move() == zfs::Color::Black);
+    CHECK(position.follow_square() == zfs::parse_square("g6"));
+    CHECK(!position.in_check(zfs::Color::Black));
+    CHECK(!position.must_follow());
+
+    zfs::MoveList legal;
+    position.generate_legal_moves(legal);
+    CHECK(legal.size() == 36U);
+    CHECK(std::none_of(legal.begin(), legal.end(), [](zfs::Move move) {
+        return move.to() == zfs::parse_square("g6");
+    }));
+
+    zfs::engine::TranspositionTable table(32);
+    zfs::engine::Searcher searcher(table);
+    zfs::engine::SearchLimits limits;
+    limits.depth = 10;
+    std::vector<zfs::engine::SearchInfo> iterations;
+    const std::atomic_bool stop{false};
+    const auto result = searcher.search(
+        zfs::Game(position), limits,
+        [&iterations](const zfs::engine::SearchInfo& info) {
+            iterations.push_back(info);
+        },
+        stop);
+
+    CHECK(result.has_move);
+    CHECK(result.depth == 10);
+    CHECK(iterations.size() == 10U);
+    CHECK(std::all_of(iterations.begin(), iterations.end(),
+                      [](const zfs::engine::SearchInfo& info) {
+                          return std::abs(info.score) <
+                                 zfs::engine::kMateThreshold;
+                      }));
+}
+
 void test_leader_initiative() {
     const auto rook_follower = load(
         "4r1k1/8/8/8/4R3/8/8/6K1 w - - 0 1 -");
@@ -337,6 +379,7 @@ void test_against_exhaustive_minimax() {
 
 int main() {
     test_mate_and_material();
+    test_reported_slow_position_is_not_a_proven_mate();
     test_leader_initiative();
     test_automatic_draw_roots();
     test_limits_and_determinism();

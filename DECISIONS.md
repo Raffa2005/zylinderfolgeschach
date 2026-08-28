@@ -819,3 +819,17 @@ and their consequences, not the code line by line.
     million depth-10 nodes, but a large evaluation is not a proof and cutting it
     off would be a strength change. The pending reported position can be
     profiled without weakening this boundary.
+
+99. **The reported `g6` position is a hard win, not a proved mate.** The
+    screenshot and seven-field ZFS-FEN agree piece for piece. Black is not in
+    check; `g6` is retained as the follow field, but none of Black's 36 legal
+    moves reaches it, so follow is inactive and the rules remain unchanged. A
+    fresh 32 MiB table reports ordinary centipawn scores at every completed
+    iteration through depth 10, ending at +4012 for Black after 22,220,125
+    nodes. Depths 9 and 10 contribute 5,301,847 and 12,341,881 new nodes,
+    respectively—79.4 percent of all work—rather than time being spent refining
+    a known mate distance. The previous and mate-stopping searches therefore do
+    identical work on this position. A large static/search evaluation is not a
+    proof, so no score-based early exit is added; the exact fixture instead
+    guards that inactive follow remains ordinary move selection and that a
+    non-mate depth-10 search completes all requested iterations.
