@@ -179,6 +179,71 @@ h2 {
   background: linear-gradient(135deg, #2b2823, #24211e);
 }
 
+.selfplay-card {
+  background: #211f1b;
+}
+
+.selfplay-summary,
+.selfplay-note {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.selfplay-summary {
+  margin: 0.65rem 0 0.8rem;
+}
+
+.selfplay-card > label {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.selfplay-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.selfplay-actions button {
+  min-width: 0;
+  padding-inline: 0.45rem;
+}
+
+.selfplay-actions .primary {
+  margin-top: 0;
+}
+
+.selfplay-meta {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #181714;
+  margin-top: 0.7rem;
+  padding: 0.72rem;
+}
+
+.selfplay-meta strong {
+  display: block;
+  color: var(--accent);
+  font-size: 0.86rem;
+}
+
+.selfplay-meta p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  margin: 0.35rem 0 0;
+}
+
+.selfplay-meta .active-review {
+  color: #9fc88b;
+}
+
+.selfplay-note {
+  margin: 0.65rem 0 0;
+}
+
 .status-line {
   display: flex;
   align-items: center;

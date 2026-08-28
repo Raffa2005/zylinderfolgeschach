@@ -3,6 +3,7 @@ import '@lichess-org/chessground/assets/chessground.base.css';
 import '@lichess-org/chessground/assets/chessground.brown.css';
 import '@lichess-org/chessground/assets/chessground.cburnett.css';
 import createZfsModule from './generated/zfs.js';
+import selfplayArchive from './selfplay-games.json';
 import './style.css';
 
 const module = await createZfsModule();
@@ -42,6 +43,13 @@ const elements = {
   promotionChoices: document.querySelector('#promotion-choices'),
   promotionDialog: document.querySelector('#promotion-dialog'),
   reset: document.querySelector('#reset'),
+  selfplayCount: document.querySelector('#selfplay-count'),
+  selfplayGame: document.querySelector('#selfplay-game'),
+  selfplayLoad: document.querySelector('#selfplay-load'),
+  selfplayMeta: document.querySelector('#selfplay-meta'),
+  selfplayNext: document.querySelector('#selfplay-next'),
+  selfplayPrevious: document.querySelector('#selfplay-previous'),
+  selfplaySummary: document.querySelector('#selfplay-summary'),
   status: document.querySelector('#status'),
   turnDot: document.querySelector('#turn-dot'),
 };
@@ -49,6 +57,7 @@ const elements = {
 let state = readState();
 let rootFen = state.fen;
 let inputLocked = false;
+let selfplayGame = null;
 const engine = {
   analysis: null,
   available: false,
@@ -83,6 +92,7 @@ const ground = Chessground(elements.board, {
   disableContextMenu: true,
 });
 
+initializeSelfplayArchive();
 render();
 void connectEngine();
 
@@ -114,6 +124,83 @@ function badge(text, className = '') {
   item.className = `badge ${className}`.trim();
   item.textContent = text;
   return item;
+}
+
+function terminationText(termination) {
+  const labels = {
+    checkmate: 'Checkmate',
+    'fifty-move': '50-move draw',
+    'ply-cap': `${selfplayArchive.limit.maxPlies}-ply safety cap`,
+    stalemate: 'Stalemate',
+    threefold: 'Threefold repetition',
+  };
+  return labels[termination] ?? termination;
+}
+
+function selectedSelfplayIndex() {
+  const index = selfplayArchive.games.findIndex(
+    (game) => game.id === elements.selfplayGame.value,
+  );
+  return index < 0 ? 0 : index;
+}
+
+function initializeSelfplayArchive() {
+  if (selfplayArchive.schema !== 1 || !selfplayArchive.games.length) {
+    throw new Error('the bundled self-play archive is invalid');
+  }
+  elements.selfplayGame.replaceChildren();
+  selfplayArchive.games.forEach((game, index) => {
+    const option = document.createElement('option');
+    const outcome = { win: 'W', draw: 'D', loss: 'L' }[game.candidateOutcome];
+    option.value = game.id;
+    option.textContent =
+      `${String(index + 1).padStart(2, '0')} · pair ${game.pair}/${game.game}` +
+      ` · ${game.result} ${terminationText(game.termination)}` +
+      ` · ${game.plies} plies · champion ${outcome}`;
+    elements.selfplayGame.append(option);
+  });
+
+  const summary = selfplayArchive.summary;
+  const terms = summary.terminations;
+  const outcomes = summary.candidateOutcomes;
+  elements.selfplayCount.textContent = `${summary.games} games`;
+  elements.selfplaySummary.textContent =
+    `${selfplayArchive.description} ${terms.checkmate ?? 0} mates, ` +
+    `${terms.threefold ?? 0} threefolds, ${terms['ply-cap'] ?? 0} safety-cap draw. ` +
+    `Champion record ${outcomes.win ?? 0}W/${outcomes.draw ?? 0}D/` +
+    `${outcomes.loss ?? 0}L (${(100 * summary.candidateScore).toFixed(2)}%).`;
+  renderSelfplay();
+}
+
+function renderSelfplay() {
+  const index = selectedSelfplayIndex();
+  const game = selfplayArchive.games[index];
+  const active = selfplayGame?.id === game.id;
+  elements.selfplayPrevious.disabled = index === 0 || inputLocked;
+  elements.selfplayNext.disabled =
+    index === selfplayArchive.games.length - 1 || inputLocked;
+  elements.selfplayLoad.disabled = inputLocked;
+  elements.selfplayLoad.textContent = active ? 'Restart game' : 'Load game';
+
+  const heading = document.createElement('strong');
+  heading.textContent = `${game.result} · ${terminationText(game.termination)}`;
+  const players = document.createElement('p');
+  players.textContent = `White: ${game.white} · Black: ${game.black}`;
+  const details = document.createElement('p');
+  details.textContent =
+    `Pair ${game.pair}, game ${game.game}, opening line ${game.openingLine} · ` +
+    `${game.plies} plies · champion ${game.candidateOutcome}`;
+  const work = document.createElement('p');
+  work.textContent =
+    `Recorded nodes — champion ${game.candidateNodes.toLocaleString()}, ` +
+    `ZFS-0 ${game.baselineNodes.toLocaleString()}`;
+  elements.selfplayMeta.replaceChildren(heading, players, details, work);
+  if (active) {
+    const position = document.createElement('p');
+    position.className = 'active-review';
+    position.textContent = `Loaded · position ${state.historyCursor}/${game.plies}`;
+    elements.selfplayMeta.append(position);
+  }
 }
 
 function canHumanMove() {
@@ -160,6 +247,9 @@ function render() {
     elements.badges.append(badge(`en passant ${state.enPassant}`));
   }
   if (state.inCheck) elements.badges.append(badge('check', 'danger'));
+  if (selfplayGame) {
+    elements.badges.append(badge(`self-play ${selfplayGame.result}`));
+  }
 
   const side = state.turn === 'white' ? 'White' : 'Black';
   if (state.terminal === 'checkmate') {
@@ -202,21 +292,35 @@ function render() {
   if (state.history.length === 0) {
     elements.history.textContent = 'No moves yet';
   } else {
+    let currentHistoryMove;
     state.history.forEach((move, index) => {
       const item = document.createElement('button');
       item.type = 'button';
       item.className = 'history-move';
       if (index >= state.historyCursor) item.classList.add('future');
-      if (index === state.historyCursor - 1) item.classList.add('current');
+      if (index === state.historyCursor - 1) {
+        item.classList.add('current');
+        currentHistoryMove = item;
+      }
       item.textContent = `${index + 1}. ${move}`;
       item.title = `Go to position after ${move}`;
       item.addEventListener('click', () => navigateTo(index + 1));
       elements.history.append(item);
     });
+    if (selfplayGame && currentHistoryMove) {
+      const historyBounds = elements.history.getBoundingClientRect();
+      const moveBounds = currentHistoryMove.getBoundingClientRect();
+      if (moveBounds.top < historyBounds.top) {
+        elements.history.scrollTop -= historyBounds.top - moveBounds.top;
+      } else if (moveBounds.bottom > historyBounds.bottom) {
+        elements.history.scrollTop += moveBounds.bottom - historyBounds.bottom;
+      }
+    }
   }
   elements.back.disabled = inputLocked || state.historyCursor === 0;
   elements.forward.disabled =
     inputLocked || state.historyCursor === state.history.length;
+  renderSelfplay();
   renderEngine();
 }
 
@@ -281,6 +385,65 @@ function sync() {
   render();
 }
 
+function loadSelfplayGame(game) {
+  if (inputLocked) return;
+  stopEngineGame('Reviewing recorded self-play');
+  inputLocked = true;
+  api.reset();
+  const initial = readState();
+  rootFen = initial.fen;
+
+  let failure = '';
+  for (const move of game.moves) {
+    if (!api.play(move)) {
+      failure = `archive move ${move} was rejected: ${api.error()}`;
+      break;
+    }
+  }
+  const completed = readState();
+  if (!failure && completed.history.length !== game.plies) {
+    failure = 'archive replay produced the wrong history length';
+  }
+  if (!failure) {
+    for (let cursor = game.plies; cursor > 0; --cursor) {
+      if (!api.back()) {
+        failure = `could not rewind archive: ${api.error()}`;
+        break;
+      }
+    }
+  }
+
+  if (failure) {
+    api.reset();
+    state = readState();
+    rootFen = state.fen;
+    selfplayGame = null;
+    inputLocked = false;
+    setError(failure);
+    render();
+    return;
+  }
+
+  state = readState();
+  selfplayGame = game;
+  engine.analysis = null;
+  engine.gameId = newGameId();
+  engine.message = `Reviewing pair ${game.pair}, game ${game.game}`;
+  elements.selfplayGame.value = game.id;
+  ground.set({ orientation: 'white' });
+  inputLocked = false;
+  setError();
+  render();
+}
+
+function loadRelativeSelfplayGame(offset) {
+  const index = Math.max(
+    0,
+    Math.min(selfplayArchive.games.length - 1, selectedSelfplayIndex() + offset),
+  );
+  loadSelfplayGame(selfplayArchive.games[index]);
+}
+
 async function onBoardMove(origin, destination) {
   if (!canHumanMove()) {
     sync();
@@ -310,7 +473,11 @@ function play(move) {
 function commitMove(move) {
   const accepted = api.play(move);
   if (!accepted) setError(api.error());
-  else setError();
+  else {
+    if (selfplayGame) engine.message = 'Archive branch; ready';
+    selfplayGame = null;
+    setError();
+  }
   sync();
   if (accepted) void maybeStartEngineMove();
 }
@@ -351,6 +518,7 @@ function startEngineGame() {
   }
 
   cancelSearch();
+  selfplayGame = null;
   engine.depth = depth;
   engine.humanColor = elements.humanColor.value;
   engine.analysis = null;
@@ -533,12 +701,25 @@ function choosePromotion(candidates) {
 
 elements.back.addEventListener('click', () => navigate(-1));
 elements.forward.addEventListener('click', () => navigate(1));
+elements.selfplayGame.addEventListener('change', () => {
+  loadSelfplayGame(selfplayArchive.games[selectedSelfplayIndex()]);
+});
+elements.selfplayLoad.addEventListener('click', () => {
+  loadSelfplayGame(selfplayArchive.games[selectedSelfplayIndex()]);
+});
+elements.selfplayPrevious.addEventListener('click', () => {
+  loadRelativeSelfplayGame(-1);
+});
+elements.selfplayNext.addEventListener('click', () => {
+  loadRelativeSelfplayGame(1);
+});
 
 elements.reset.addEventListener('click', () => {
   cancelSearch();
   api.reset();
   state = readState();
   rootFen = state.fen;
+  selfplayGame = null;
   engine.analysis = null;
   engine.gameId = newGameId();
   engine.message = engine.enabled ? 'Starting new game' : 'Ready';
@@ -559,6 +740,7 @@ elements.loadFen.addEventListener('click', () => {
   }
   state = readState();
   rootFen = state.fen;
+  selfplayGame = null;
   engine.analysis = null;
   setError();
   render();

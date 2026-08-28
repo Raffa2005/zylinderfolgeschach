@@ -50,6 +50,7 @@ try {
   assert.equal(pageResponse.status, 200);
   const page = await pageResponse.text();
   assert.match(page, /Play against engine/);
+  assert.match(page, /Self-play archive/);
   assert.doesNotMatch(page, /Edge-case presets/);
 
   const invalidResponse = await fetch(`${service.url}/api/engine/move`, {

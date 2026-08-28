@@ -155,6 +155,24 @@ destinations and the follow field remain visible. Left/Right navigate the move
 line; navigation deliberately stops engine-play mode so an in-flight reply
 cannot land on a historical position.
 
+The same page includes all 64 games from the final champion-#3-versus-ZFS-0
+checkpoint: 56 checkmates, seven automatic threefolds, and one draw imposed by
+the match runner's 256-ply safety cap. Selecting a game replays every move
+through the WebAssembly rules core and rewinds to its start. Arrow keys, the
+move list, and the legal-destination display then work normally. Playing a move
+from a reviewed position deliberately leaves the recorded line and creates a
+new branch.
+
+The committed archive is generated from a checksummed match log rather than
+maintained by hand. A new archive can be exported with:
+
+```sh
+python3 tools/export_selfplay_gallery.py run.jsonl \
+  viewer/src/selfplay-games.json \
+  --candidate-name 'Kugelfisch candidate' --baseline-name 'Kugelfisch baseline' \
+  --title 'Candidate vs baseline' --description 'Recorded paired checkpoint.'
+```
+
 The server keeps one UCI process alive and allows only one search at a time.
 Each browser game gets a session identifier: `ucinewgame` clears the TT at the
 session boundary, while later moves in that game retain useful TT entries. The

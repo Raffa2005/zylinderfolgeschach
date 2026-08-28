@@ -14,8 +14,8 @@
           <h1>Kugelfisch</h1>
         </div>
         <p class="intro">
-          Play Zylinderfolgeschach against the local C++ engine while the browser
-          shows every legal destination and the active follow field.
+          Play Zylinderfolgeschach against the local C++ engine or inspect its
+          recorded self-play, with every legal destination and follow field.
         </p>
       </header>
 
@@ -48,6 +48,28 @@
               <strong id="status">Loading rules…</strong>
             </div>
             <div id="badges" class="badges"></div>
+          </section>
+
+          <section class="selfplay-card">
+            <div class="label-row">
+              <h2>Self-play archive</h2>
+              <span id="selfplay-count" class="count">0 games</span>
+            </div>
+            <p id="selfplay-summary" class="selfplay-summary"></p>
+            <label for="selfplay-game">Recorded game</label>
+            <select id="selfplay-game"></select>
+            <div class="selfplay-actions">
+              <button id="selfplay-previous" type="button">← Previous</button>
+              <button id="selfplay-load" class="primary" type="button">
+                Load game
+              </button>
+              <button id="selfplay-next" type="button">Next →</button>
+            </div>
+            <div id="selfplay-meta" class="selfplay-meta"></div>
+            <p class="selfplay-note">
+              Arrow keys traverse the recorded line. Playing a legal move creates
+              a new branch and leaves archive mode.
+            </p>
           </section>
 
           <section class="engine-card">

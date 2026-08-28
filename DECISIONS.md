@@ -551,3 +551,14 @@ and their consequences, not the code line by line.
     namespaces, ZFS-FEN, protocol extensions, environment variables, and rules
     terminology keep `zfs` because renaming those stable interfaces would create
     migration work without changing the product identity.
+
+68. **Human review uses complete, machine-verified self-play games.** The viewer
+    ships all 64 games from the final champion-#3-versus-ZFS-0 checkpoint rather
+    than a curated set of attractive wins. The export strips deployment paths
+    and fingerprints but retains colors, result, termination, opening-line
+    identity, work totals, and the complete UCI move list. A generated-runtime
+    test replays every move through the production WebAssembly rules core and
+    verifies the final checkmate, threefold, or still-ongoing safety-cap state.
+    The browser loads the whole line and rewinds it, so existing arrow and move
+    navigation inspect exact historical follow state. A user move intentionally
+    branches from and leaves archive mode; the recorded game is never mutated.
