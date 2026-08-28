@@ -70,6 +70,11 @@ function terminalText(state) {
   return labels[state.terminal] ?? `${sideName(state.turn)} to move`;
 }
 
+function resignationText(humanColor) {
+  const winner = humanColor === 'white' ? 'black' : 'white';
+  return `Resignation · ${sideName(winner)} wins`;
+}
+
 function followText(state) {
   if (state.followForced) return `Follow ${state.follow}`;
   if (state.follow !== '-') return `No legal move reaches ${state.follow}`;
@@ -128,7 +133,7 @@ function boardUpdate(state, movable, orientation, engineMove) {
   const lastMove = state.history[state.historyCursor - 1];
   const arrow = MOVE_PATTERN.test(engineMove ?? '') &&
     state.legalMoves.includes(engineMove)
-    ? [{ orig: engineMove.slice(0, 2), dest: engineMove.slice(2, 4), brush: 'green' }]
+    ? [{ orig: engineMove.slice(0, 2), dest: engineMove.slice(2, 4), brush: 'paleBlue' }]
     : [];
   return {
     fen: state.board,
@@ -228,7 +233,7 @@ async function initializePlay() {
     positionCard: element('position-card'),
     promotionChoices: element('promotion-choices'), promotionDialog: element('promotion-dialog'),
     setupForm: element('setup-form'), setupMessage: element('setup-message'),
-    setupView: element('setup-view'),
+    resign: element('resign'), setupView: element('setup-view'),
     start: element('start-game'), startPosition: element('start-position'),
     status: element('status'), statusDetail: element('status-detail'),
     topMeta: element('top-player-meta'), topName: element('top-player'),
@@ -240,6 +245,7 @@ async function initializePlay() {
   let ground;
   let orientation = 'white';
   let inputLocked = false;
+  let adjudication = null;
   let saveChain = Promise.resolve();
   const playingEngine = new PlayingEngine();
   const engine = {
@@ -254,7 +260,8 @@ async function initializePlay() {
   }
 
   function canMove() {
-    return !inputLocked && !engine.thinking && state.terminal === 'ongoing' &&
+    return !inputLocked && !engine.thinking && !adjudication &&
+      state.terminal === 'ongoing' &&
       state.historyCursor === state.history.length &&
       (!engine.enabled || state.turn === engine.humanColor);
   }
@@ -266,7 +273,7 @@ async function initializePlay() {
       const human = color === engine.humanColor;
       name.textContent = human ? 'You' : 'Kugelfisch';
       meta.textContent = sideName(color);
-      if (state.terminal !== 'ongoing') status.textContent = 'Finished';
+      if (adjudication || state.terminal !== 'ongoing') status.textContent = 'Finished';
       else if (state.turn !== color) status.textContent = 'Waiting';
       else if (!human && engine.thinking) status.textContent = 'Thinking';
       else status.textContent = 'To move';
@@ -279,10 +286,12 @@ async function initializePlay() {
   function render() {
     if (!elements.gameView.hidden) ensureBoard().set(boardUpdate(state, canMove(), orientation));
     const reviewing = state.historyCursor !== state.history.length;
-    const terminal = state.terminal !== 'ongoing' && !reviewing;
+    const terminal = (adjudication || state.terminal !== 'ongoing') && !reviewing;
     elements.status.textContent = reviewing
       ? `Move ${state.historyCursor} of ${state.history.length}`
-      : state.terminal === 'ongoing'
+      : adjudication === 'resignation'
+        ? resignationText(engine.humanColor)
+        : state.terminal === 'ongoing'
         ? `${sideName(state.turn)} to move`
         : terminalText(state);
     elements.statusDetail.textContent = terminal
@@ -297,6 +306,9 @@ async function initializePlay() {
     elements.back.disabled = inputLocked || state.historyCursor === 0;
     elements.forward.disabled = inputLocked || state.historyCursor === state.history.length;
     elements.live.disabled = inputLocked || state.historyCursor === state.history.length;
+    elements.resign.disabled = inputLocked || Boolean(adjudication) ||
+      state.terminal !== 'ongoing' || !engine.gameId ||
+      state.historyCursor !== state.history.length;
     renderPlayers();
   }
 
@@ -310,7 +322,8 @@ async function initializePlay() {
       rootFen, finalFen: state.fen,
       moves: state.history.slice(0, state.historyCursor),
       humanColor: engine.humanColor, depth: engine.depth,
-      turn: state.turn, terminal: state.terminal, createdAt: engine.createdAt,
+      turn: state.turn, terminal: adjudication ?? state.terminal,
+      createdAt: engine.createdAt,
     };
   }
 
@@ -374,6 +387,7 @@ async function initializePlay() {
     api.reset();
     state = readState();
     rootFen = state.fen;
+    adjudication = null;
     engine.depth = Number(elements.depth.value);
     engine.humanColor = requested === 'random' ? randomColor() : requested;
     engine.gameId = newId();
@@ -396,6 +410,7 @@ async function initializePlay() {
     api.reset();
     state = readState();
     rootFen = state.fen;
+    adjudication = null;
     elements.gameView.hidden = true;
     elements.setupView.hidden = false;
     document.body.classList.remove('active-game');
@@ -403,7 +418,8 @@ async function initializePlay() {
   }
 
   async function maybeEngineMove() {
-    if (!engine.enabled || engine.thinking || state.turn === engine.humanColor ||
+    if (!engine.enabled || adjudication || engine.thinking ||
+        state.turn === engine.humanColor ||
         state.terminal !== 'ongoing') {
       if (engine.enabled && state.terminal !== 'ongoing') {
         void playingEngine.stopPonder();
@@ -493,6 +509,13 @@ async function initializePlay() {
 
   elements.setupForm.addEventListener('submit', beginGame);
   elements.newGame.addEventListener('click', returnToSetup);
+  elements.resign.addEventListener('click', () => {
+    if (elements.resign.disabled || !window.confirm('Resign this game?')) return;
+    adjudication = 'resignation';
+    stopGame('Game over');
+    saveGame();
+    render();
+  });
   elements.flip.addEventListener('click', () => {
     orientation = orientation === 'white' ? 'black' : 'white';
     ensureBoard().toggleOrientation();

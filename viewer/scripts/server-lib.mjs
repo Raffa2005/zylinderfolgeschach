@@ -5,6 +5,10 @@ import path from 'node:path';
 
 import { UciEngineClient } from './engine-client.mjs';
 import { GameStore } from './game-store.mjs';
+import {
+  parseSavedGamePage,
+  validateSavedGame,
+} from '../shared/saved-games.mjs';
 
 export const DEFAULT_ENGINE_DEPTH = 10;
 
@@ -86,75 +90,6 @@ function validateSearch(body) {
     return move;
   });
   return { depth, gameId: body.gameId, rootFen: body.rootFen.trim(), moves };
-}
-
-function boundedFen(value, name) {
-  if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.length > 256 ||
-    /[\r\n]/.test(value)
-  ) {
-    throw new HttpError(400, `${name} must be one bounded FEN line`);
-  }
-  const normalized = value.trim();
-  const fields = normalized.split(/\s+/).length;
-  if (fields !== 6 && fields !== 7) {
-    throw new HttpError(400, `${name} must contain six or seven fields`);
-  }
-  return normalized;
-}
-
-function validateStoredGame(id, body) {
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    throw new HttpError(400, 'saved game must be an object');
-  }
-  const humanColor = body.humanColor;
-  if (humanColor !== 'white' && humanColor !== 'black') {
-    throw new HttpError(400, 'humanColor must be white or black');
-  }
-  if (!Number.isInteger(body.depth) || body.depth < 1 || body.depth > 100) {
-    throw new HttpError(400, 'depth must be an integer from 1 to 100');
-  }
-  if (!Number.isSafeInteger(body.createdAt) || body.createdAt < 0) {
-    throw new HttpError(400, 'createdAt must be a non-negative timestamp');
-  }
-  if (!Array.isArray(body.moves) || body.moves.length > 4096) {
-    throw new HttpError(400, 'moves must be a bounded array');
-  }
-  const moves = body.moves.map((move) => {
-    if (typeof move !== 'string' || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
-      throw new HttpError(400, 'moves must contain canonical UCI moves');
-    }
-    return move;
-  });
-  const terminal = body.terminal;
-  if (!['ongoing', 'checkmate', 'stalemate', 'threefold', 'fifty-move'].includes(terminal)) {
-    throw new HttpError(400, 'terminal has an unsupported value');
-  }
-  if (body.turn !== 'white' && body.turn !== 'black') {
-    throw new HttpError(400, 'turn must be white or black');
-  }
-  const completed = terminal !== 'ongoing';
-  const result = terminal === 'checkmate'
-    ? body.turn === 'white' ? '0-1' : '1-0'
-    : completed ? '1/2-1/2' : '*';
-  return {
-    id,
-    rootFen: boundedFen(body.rootFen, 'rootFen'),
-    finalFen: boundedFen(body.finalFen, 'finalFen'),
-    moves,
-    humanColor,
-    depth: body.depth,
-    turn: body.turn,
-    status: completed ? 'completed' : 'active',
-    result,
-    termination: terminal,
-    white: humanColor === 'white' ? 'You' : 'Kugelfisch',
-    black: humanColor === 'black' ? 'You' : 'Kugelfisch',
-    createdAt: body.createdAt,
-    updatedAt: Date.now(),
-  };
 }
 
 async function executableExists(enginePath) {
@@ -298,30 +233,7 @@ export async function startViewerServer({
 
       if (url.pathname === '/api/games') {
         if (request.method !== 'GET') throw new HttpError(405, 'method not allowed');
-        for (const name of url.searchParams.keys()) {
-          if (name !== 'limit' && name !== 'cursor') {
-            throw new HttpError(400, 'unsupported game-list parameter');
-          }
-        }
-        const rawLimit = url.searchParams.get('limit') ?? '20';
-        const rawCursor = url.searchParams.get('cursor');
-        if (!/^\d+$/.test(rawLimit)) {
-          throw new HttpError(400, 'game-list limit is invalid');
-        }
-        const limit = Number(rawLimit);
-        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-          throw new HttpError(400, 'game-list limit must be from 1 to 100');
-        }
-        let cursor;
-        if (rawCursor !== null) {
-          if (!/^\d+$/.test(rawCursor)) {
-            throw new HttpError(400, 'game-list cursor is invalid');
-          }
-          cursor = Number(rawCursor);
-          if (!Number.isSafeInteger(cursor)) {
-            throw new HttpError(400, 'game-list cursor is invalid');
-          }
-        }
+        const { cursor, limit } = parseSavedGamePage(url);
         writeJson(response, 200, gameStore.list(limit, cursor));
         return;
       }
@@ -339,20 +251,10 @@ export async function startViewerServer({
         if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
           throw new HttpError(415, 'content type must be application/json');
         }
-        const game = validateStoredGame(id, await readJson(request));
-        try {
-          const saved = await gameStore.put(game);
-          writeJson(response, 200, { game: saved });
-          return;
-        } catch (error) {
-          if (error?.code === 'GAME_CONFLICT') {
-            throw new HttpError(409, error.message);
-          }
-          if (error?.code === 'GAME_LIMIT') {
-            throw new HttpError(507, error.message);
-          }
-          throw error;
-        }
+        const game = validateSavedGame(id, await readJson(request));
+        const saved = await gameStore.put(game);
+        writeJson(response, 200, { game: saved });
+        return;
       }
 
       if (
@@ -510,7 +412,7 @@ export async function startViewerServer({
         if (!response.writableEnded) response.end();
         return;
       }
-      const status = error instanceof HttpError
+      const status = error instanceof HttpError || Number.isInteger(error?.status)
         ? error.status
         : error?.code === 'ENOENT'
           ? 404

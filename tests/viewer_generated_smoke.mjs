@@ -129,6 +129,10 @@ const engineDistribution = await fs.readFile(
   new URL('../viewer/dist/engine-worker.js', import.meta.url),
   'utf8',
 );
+const cloudflareRoutes = JSON.parse(await fs.readFile(
+  new URL('../viewer/dist/_routes.json', import.meta.url),
+  'utf8',
+));
 const generatedHash = createHash('sha256').update(generated).digest('hex');
 const engineHash = createHash('sha256').update(engineGenerated).digest('hex');
 requireCondition(
@@ -143,11 +147,19 @@ requireCondition(distribution.includes('threefold'),
                  'distribution lacks threefold rendering');
 requireCondition(distribution.includes('fifty-move'),
                  'distribution lacks fifty-move rendering');
+requireCondition(distribution.includes('resignation'),
+                 'distribution lacks resignation handling');
 requireCondition(distribution.includes('/api/games'),
                  'distribution lacks saved-game support');
 requireCondition(distribution.includes('/engine-worker.js'),
                  'distribution lacks the client engine worker');
 requireCondition(!distribution.includes('/api/engine/'),
                  'distribution still depends on the server engine');
+requireCondition(
+  cloudflareRoutes.version === 1 &&
+    cloudflareRoutes.include.length === 1 &&
+    cloudflareRoutes.include[0] === '/api/*',
+  'Cloudflare routes invoke Functions outside the saved-game API',
+);
 
 console.log('generated viewer runtime passed');

@@ -67,6 +67,9 @@ button.primary:hover:not(:disabled), .button.primary:hover {
   background: #e2b65f;
 }
 
+button.danger { color: var(--danger); }
+button.danger:hover:not(:disabled) { border-color: #9a5651; background: #3a2826; }
+
 button:disabled { cursor: default; opacity: .42; }
 
 button:focus-visible, .button:focus-visible, a:focus-visible, input:focus-visible,
@@ -421,7 +424,7 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 .replay-controls button { width: 40px; padding: 0; }
 .replay-controls.wide { grid-template-columns: 40px 40px auto 40px 40px; align-items: center; margin: 15px 17px; }
 .replay-controls.wide span { min-width: 65px; text-align: center; color: var(--muted); font: 700 11px/1 monospace; }
-.game-actions { display: grid; grid-template-columns: 1fr 1fr; margin-top: 0; }
+.game-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; margin-top: 0; }
 body.active-game .site-header, body.active-game .header-inner { min-height: 52px; }
 body.active-game .site-footer { display: none; }
 

@@ -722,3 +722,55 @@ and their consequences, not the code line by line.
     landing mark, header/home control, and favicon use the same circular SVG and
     the original typographic double arrow. Board-edge seam arrows remain plain
     coordinate cues rather than being confused with clickable brand controls.
+
+88. **Fixed-depth WASM search is deterministic given identical search state.**
+    Seven sequential depth-10 searches with the same 32 MiB TT produced
+    identical best moves, scores, node counts, and PVs in native C++ and WASM.
+    The former server used 64 MiB, while browser cancellation destroys and
+    recreates the 32 MiB worker table. Those lifecycle differences can alter a
+    selective search even at fixed depth: in a 22-position comparison, retaining
+    versus clearing the same-sized TT selected `g4a3` versus `g4e3` in one tied
+    0.00 position. This is cache-history sensitivity, not randomness. Doubling
+    browser memory or clearing every foreground search would not make the two
+    lifecycles equivalent and would impose a real memory or strength cost, so
+    neither is disguised as a determinism fix.
+
+89. **Resignation is a game adjudication, not a fabricated board terminal.**
+    The C++ position remains the exact replayable last position. Play records
+    the human as the losing side, stops foreground and ponder work, disables
+    further moves, gives the ordinary terminal treatment, and persists an
+    immutable `resignation` result. A confirmation prevents a single accidental
+    click from ending the game. Replays therefore remain legal move sequences
+    without teaching the rules core an event that is not a chess position.
+
+90. **The analysis PV uses the established Lichess-style best-move brush.** The
+    arrow is Chessground's `paleBlue` brush—the same best-line treatment used in
+    the Bachelor and InstinctaZero interfaces—not a custom approximation and not
+    the opaque green annotation brush. This keeps Chessground responsible for
+    geometry, scaling, and orientation while producing the intended muted
+    blue-grey arrow.
+
+91. **Cloudflare serves computation as static assets and storage as one narrow
+    Function.** Rules and search remain entirely in the two browser WebAssembly
+    payloads. Pages Functions are invoked only for `/api/*`; all HTML, CSS,
+    JavaScript, SVG, and embedded WASM requests stay on the static asset path.
+    The existing game list/detail contract is preserved, so Play, Games, and
+    Analysis do not contain a Cloudflare-specific storage branch.
+
+92. **Hosted saved games use D1 with the same append-forward invariant.** A
+    versioned migration creates the bounded schema. Shared validation defines
+    IDs, FEN/move limits, results, pagination, immutable completed games, and
+    prefix-only updates for both the local JSON store and D1. D1 updates use a
+    revision compare-and-swap so concurrent requests cannot silently replace a
+    record derived from stale state. Queries are parameterized, JSON bodies are
+    streamed through a 64 KiB limit, and unexpected database errors are not
+    returned to clients. The 5,000-game ceiling remains a deliberate prototype
+    bound rather than an unbounded public write surface.
+
+93. **Cloudflare tooling is pinned and account configuration is explicit.** The
+    viewer pins Wrangler 4.127.1 and Node 22, keeps the Wrangler JSON file as the
+    deployment source of truth, and applies a checked-in D1 migration before
+    public verification. Local Node serving remains available for development
+    and keeps its existing JSON database; deployment does not make the laptop an
+    origin server. Cloudflare OAuth credentials and account resources are never
+    committed.

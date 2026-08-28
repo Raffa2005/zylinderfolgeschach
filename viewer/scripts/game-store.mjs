@@ -1,8 +1,14 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  classifySavedGameUpdate,
+  MAX_SAVED_GAMES,
+  SavedGameError,
+  savedGameSummary,
+} from '../shared/saved-games.mjs';
+
 const SCHEMA = 1;
-const MAX_GAMES = 5000;
 
 export class GameStore {
   static async open(filename) {
@@ -29,7 +35,7 @@ export class GameStore {
     if (data?.schema !== SCHEMA || !Array.isArray(data.games)) {
       throw new Error('saved-game database has an unsupported schema');
     }
-    if (data.games.length > MAX_GAMES) {
+    if (data.games.length > MAX_SAVED_GAMES) {
       throw new Error('saved-game database exceeds its record limit');
     }
     for (const game of data.games) {
@@ -48,20 +54,7 @@ export class GameStore {
     const page = games.slice(start, start + limit);
     const next = start + page.length;
     return {
-      games: page.map((game) => ({
-        id: game.id,
-        createdAt: game.createdAt,
-        updatedAt: game.updatedAt,
-        status: game.status,
-        result: game.result,
-        termination: game.termination,
-        white: game.white,
-        black: game.black,
-        humanColor: game.humanColor,
-        depth: game.depth,
-        plies: game.moves.length,
-        finalFen: game.finalFen,
-      })),
+      games: page.map(savedGameSummary),
       nextCursor: next < games.length ? String(next) : null,
     };
   }
@@ -73,31 +66,10 @@ export class GameStore {
   async put(game) {
     const operation = this.writeChain.then(async () => {
       const previous = this.games.get(game.id);
-      if (previous) {
-        const sameGame =
-          previous.rootFen === game.rootFen &&
-          previous.humanColor === game.humanColor &&
-          previous.depth === game.depth &&
-          previous.createdAt === game.createdAt;
-        const extendsLine =
-          previous.moves.length <= game.moves.length &&
-          previous.moves.every((move, index) => move === game.moves[index]);
-        const repeatsCompleted = sameGame && previous.status === 'completed' &&
-          previous.finalFen === game.finalFen &&
-          previous.turn === game.turn &&
-          previous.termination === game.termination &&
-          previous.moves.length === game.moves.length &&
-          previous.moves.every((move, index) => move === game.moves[index]);
-        if (repeatsCompleted) return previous;
-        if (!sameGame || !extendsLine || previous.status === 'completed') {
-          const error = new Error('saved game update conflicts with its record');
-          error.code = 'GAME_CONFLICT';
-          throw error;
-        }
-      } else if (this.games.size >= MAX_GAMES) {
-        const error = new Error('saved-game database is full');
-        error.code = 'GAME_LIMIT';
-        throw error;
+      const updateKind = classifySavedGameUpdate(previous, game);
+      if (updateKind === 'unchanged') return previous;
+      if (updateKind === 'insert' && this.games.size >= MAX_SAVED_GAMES) {
+        throw new SavedGameError(507, 'saved-game database is full');
       }
 
       const nextGames = new Map(this.games);

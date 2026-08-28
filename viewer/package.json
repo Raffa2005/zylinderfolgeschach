@@ -7,6 +7,9 @@
     "build:wasm": "bash scripts/build-wasm.sh",
     "build:ui": "node scripts/build-ui.mjs",
     "build": "npm run build:wasm && npm run build:ui",
+    "build:cloudflare": "npm run build:ui",
+    "dev:cloudflare": "wrangler pages dev",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy",
     "dev": "npm run build && node scripts/serve.mjs",
     "play": "npm run build:ui && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs"
@@ -15,6 +18,10 @@
     "@lichess-org/chessground": "10.1.1"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "wrangler": "4.127.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

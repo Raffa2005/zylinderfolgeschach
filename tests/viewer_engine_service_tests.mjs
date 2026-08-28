@@ -91,6 +91,7 @@ try {
   assert.equal(playResponse.status, 200);
   const playPage = await playResponse.text();
   assert.match(playPage, /<h1>New game<\/h1>/);
+  assert.match(playPage, /id="resign"/);
   assert.doesNotMatch(playPage, /engine-score|engine-pv|analysis-fen|ZFS-FEN/);
   assert.doesNotMatch(playPage, /Online|Offline|Connecting/);
 
@@ -177,9 +178,26 @@ try {
   });
   assert.equal(conflictResponse.status, 409);
 
+  const resignationResponse = await fetch(`${service.url}/api/games/resigned-game`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...initialGame,
+      humanColor: 'black',
+      terminal: 'resignation',
+    }),
+  });
+  assert.equal(resignationResponse.status, 200);
+  const resignedGame = (await resignationResponse.json()).game;
+  assert.equal(resignedGame.status, 'completed');
+  assert.equal(resignedGame.result, '1-0');
+
   const persistedGames = JSON.parse(await readFile(gamesPath, 'utf8'));
   assert.equal(persistedGames.schema, 1);
-  assert.equal(persistedGames.games[0].moves[0], 'e2e4');
+  assert.equal(
+    persistedGames.games.find((game) => game.id === 'test-game').moves[0],
+    'e2e4',
+  );
 
   const invalidResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',

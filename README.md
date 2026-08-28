@@ -156,7 +156,8 @@ and arbitrary-position loading are deliberately absent. Left/Right review the
 move line without allowing a historical position to fork the played game;
 returning to the live position safely resumes play. Move lists use SAN derived
 by the C++ variant rules core, with UCI retained as a fallback rather than
-reimplemented in the page.
+reimplemented in the page. Resigning ends and saves the game without adding a
+fictitious terminal position to its replay.
 
 After every engine move, the browser uses the second move of the completed PV
 as the expected human reply and searches that resulting position to the chosen
@@ -190,6 +191,37 @@ service now supplies only static files and the saved-game database to the pages.
 `ZFS_VIEWER_PORT` changes the default port 4173.
 `ZFS_VIEWER_GAMES_PATH` changes the saved-game file. The service binds only to
 `127.0.0.1`.
+
+## Deploy the viewer to Cloudflare
+
+The production deployment target is Cloudflare Pages. The rules and engine run in
+the browser; only the saved-game API executes as a Pages Function, backed by D1.
+Static requests therefore do not use the laptop or an engine server.
+
+Use Node 22 and authenticate Wrangler once:
+
+```sh
+cd viewer
+npm ci
+npx wrangler login
+```
+
+For the first deployment, create the Western Europe database, apply the checked-
+in schema, create the Pages project, and deploy:
+
+```sh
+npx wrangler d1 create kugelfisch-games --location weur \
+  --binding DB --update-config
+npx wrangler d1 migrations apply DB --remote
+npx wrangler pages project create kugelfisch --production-branch main
+npm run deploy:cloudflare
+```
+
+Wrangler writes the non-secret D1 resource ID into `viewer/wrangler.jsonc`.
+Later deployments need only `npm run deploy:cloudflare`; a schema change first
+runs `npx wrangler d1 migrations apply DB --remote`. `build:cloudflare` bundles
+the committed WASM payloads without requiring Emscripten. Recompile those
+payloads with `npm run build` whenever C++ rules or engine source changes.
 
 ## License
 
