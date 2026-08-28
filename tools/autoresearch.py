@@ -404,7 +404,7 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--reference-build")
     run_parser.add_argument("--baseline-id", default="ddbcfad-zfs0")
     run_parser.add_argument("--manifest", default="autoresearch/baseline.json")
-    run_parser.add_argument("--openings", default="openings/screen-v1.txt")
+    run_parser.add_argument("--openings", default="openings/screen-v2.txt")
     run_parser.add_argument("--ledger", default="autoresearch/ledger.jsonl")
     run_parser.add_argument("--raw-dir", default="build-autoresearch-results")
     run_parser.add_argument("--core", type=int, default=-1)

@@ -9,6 +9,7 @@
   },
   "opening_suites": {
     "openings/holdout-v1.txt": "546ee26bea69d4da509f29bf7bce24296a573d3e58f46efe24f280cc677a80b7",
-    "openings/screen-v1.txt": "71eb10c3ed2bb5e6455be0e12b6c0e4095b07eac92179938f36d95fbe0d52dea"
+    "openings/screen-v1.txt": "71eb10c3ed2bb5e6455be0e12b6c0e4095b07eac92179938f36d95fbe0d52dea",
+    "openings/screen-v2.txt": "3403fa5aff8c14f6607bf61485f5c0c1ed6f0f596ff084643fbf72f20ca12aff"
   }
 }

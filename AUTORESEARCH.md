@@ -10,7 +10,7 @@ against a moving previous candidate.
 1. Correctness tests run before measurement. A failure rejects the experiment.
 2. Fixed-depth benchmark runs are interleaved baseline/candidate on one pinned
    core. Nodes measure search work; median time measures implementation cost.
-3. Routine tuning uses only `openings/screen-v1.txt`. The holdout is reserved
+3. Routine tuning uses only `openings/screen-v2.txt`. The holdout is reserved
    for a stack that has already earned promotion.
 4. Strength uses fixed-node, color-swapped pairs with the ZFS-0 match referee.
    The controller verifies its binary and the opening book against
@@ -62,3 +62,7 @@ machine-readable ledger event. It never edits source or automatically declares
 a winner. After the first promotion, `--reference-build` can point at a frozen
 champion artifact while `--baseline-build` continues to provide the immutable
 ZFS-0 referee. Direct champion-versus-ZFS-0 checks report cumulative gain.
+
+`screen-v2` contains 256 independently generated, color-swapped training lines.
+The original 32-line `screen-v1` remains frozen for reproducing early results;
+`holdout-v1` remains excluded from routine tuning.
