@@ -149,20 +149,26 @@ npm install
 npm run play
 ```
 
-Open the local URL printed by the command, choose a side and depth, then select
-“Play from this position.” Depth 10 is the default. Iterative depth, score,
-nodes, and principal variation are streamed while the engine thinks. Legal
-destinations and the follow field remain visible. Left/Right navigate the move
-line; navigation deliberately stops engine-play mode so an in-flight reply
-cannot land on a historical position.
+Open the local URL printed by the command. The landing page links to focused
+Play, Games, and Rules sections. Play offers a server-engine game with side and
+depth selection; there are deliberately no clocks. Depth 10 is the standard
+default. Iterative depth, score, nodes, and principal variation are streamed
+while Kugelfisch thinks. Legal destinations and the follow field remain
+visible. Left/Right navigate the move line; navigation deliberately stops
+engine-play mode so an in-flight reply cannot land on a historical position.
 
-The same page includes all 64 games from the final champion-#3-versus-ZFS-0
-checkpoint: 56 checkmates, seven automatic threefolds, and one draw imposed by
-the match runner's 256-ply safety cap. Selecting a game replays every move
-through the WebAssembly rules core and rewinds to its start. Arrow keys, the
-move list, and the legal-destination display then work normally. Playing a move
-from a reviewed position deliberately leaves the recorded line and creates a
-new branch.
+After every engine move, the service uses the second move of the completed PV
+as the expected human reply and searches that resulting position with UCI
+ponder mode. A matching reply uses `ponderhit`; a different reply cancels the
+speculation before the ordinary search starts. Pondering uses the same one
+native search worker—there is never a foreground and background engine search
+at once—and it is cancelled when the game or page closes.
+
+The Games section includes all 64 games from the final
+champion-#3-versus-ZFS-0 checkpoint: 56 checkmates, seven automatic
+threefolds, and one draw imposed by the match runner's 256-ply safety cap.
+Selecting a game replays every move through the WebAssembly rules core and
+rewinds to its start. Arrow keys and the move list then work normally.
 
 The committed archive is generated from a checksummed match log rather than
 maintained by hand. A new archive can be exported with:

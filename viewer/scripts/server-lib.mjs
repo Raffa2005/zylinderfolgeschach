@@ -108,9 +108,10 @@ export async function startViewerServer({
   const engine = engineAvailable ? new UciEngineClient(resolvedEngine) : null;
   let activeSearch;
   let closing = false;
+  let ponderState;
   let searchTransition = Promise.resolve();
 
-  const replaceSearch = async (reason) => {
+  const withSearchTransition = async (operation) => {
     let releaseTransition;
     const previousTransition = searchTransition;
     searchTransition = new Promise((resolve) => {
@@ -118,6 +119,79 @@ export async function startViewerServer({
     });
     await previousTransition;
     try {
+      return await operation();
+    } finally {
+      releaseTransition();
+    }
+  };
+
+  const stopPonder = async (reason, gameId) => {
+    const current = ponderState;
+    if (!current || (gameId !== undefined && current.gameId !== gameId)) return;
+    ponderState = undefined;
+    current.controller.abort(new Error(reason));
+    await current.outcome;
+  };
+
+  const beginPonder = (search, bestMove, info) => {
+    const predictedMove = info?.pv?.[0] === bestMove ? info.pv[1] : undefined;
+    if (
+      closing ||
+      typeof predictedMove !== 'string' ||
+      !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(predictedMove)
+    ) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const expectedMoves = [...search.moves, bestMove, predictedMove];
+    const current = {
+      controller,
+      depth: search.depth,
+      expectedMoves,
+      gameId: search.gameId,
+      latestInfo: null,
+      outcome: null,
+      rootFen: search.rootFen,
+      settled: false,
+    };
+    current.outcome = engine.search({
+      ...search,
+      moves: expectedMoves,
+      ponder: true,
+      signal: controller.signal,
+      onInfo: (ponderInfo) => {
+        current.latestInfo = ponderInfo;
+      },
+    }).then(
+      (result) => ({ result }),
+      (error) => ({ error }),
+    ).finally(() => {
+      current.settled = true;
+    });
+    ponderState = current;
+    return predictedMove;
+  };
+
+  const claimPonder = async (search) => {
+    const current = ponderState;
+    if (!current) return undefined;
+    ponderState = undefined;
+    const matches =
+      !current.settled &&
+      current.gameId === search.gameId &&
+      current.rootFen === search.rootFen &&
+      current.depth === search.depth &&
+      current.expectedMoves.length === search.moves.length &&
+      current.expectedMoves.every((move, index) => move === search.moves[index]);
+    if (matches) return current;
+    current.controller.abort(new Error('ponder prediction was not played'));
+    await current.outcome;
+    return undefined;
+  };
+
+  const replaceSearch = async (reason, gameId) => {
+    return withSearchTransition(async () => {
       if (closing) throw new HttpError(503, 'viewer server is closing');
       if (activeSearch) {
         activeSearch.controller.abort(new Error(reason));
@@ -128,12 +202,10 @@ export async function startViewerServer({
       const done = new Promise((resolve) => {
         finish = resolve;
       });
-      const search = { controller, done, finish };
+      const search = { controller, done, finish, gameId };
       activeSearch = search;
       return search;
-    } finally {
-      releaseTransition();
-    }
+    });
   };
 
   const server = createServer(async (request, response) => {
@@ -158,6 +230,7 @@ export async function startViewerServer({
 
         const currentSearch = await replaceSearch(
           'superseded by a new engine request',
+          search.gameId,
         );
         const { controller } = currentSearch;
         try {
@@ -178,11 +251,51 @@ export async function startViewerServer({
           });
 
           try {
-            const result = await engine.search({
-              ...search,
-              signal: controller.signal,
-              onInfo: (info) => sendEvent({ type: 'info', ...info }),
-            });
+            const claimedPonder = await claimPonder(search);
+            let result;
+            let latestInfo;
+            if (claimedPonder) {
+              const abortPonder = () => {
+                claimedPonder.controller.abort(controller.signal.reason);
+              };
+              controller.signal.addEventListener('abort', abortPonder, {
+                once: true,
+              });
+              if (controller.signal.aborted) {
+                abortPonder();
+                throw controller.signal.reason;
+              }
+              if (claimedPonder.latestInfo) {
+                sendEvent({ type: 'info', ...claimedPonder.latestInfo });
+              }
+              sendEvent({ type: 'ponderhit' });
+              try {
+                engine.ponderHit();
+                const outcome = await claimedPonder.outcome;
+                if (outcome.error) throw outcome.error;
+                result = outcome.result;
+                latestInfo = claimedPonder.latestInfo;
+              } finally {
+                controller.signal.removeEventListener('abort', abortPonder);
+              }
+            } else {
+              result = await engine.search({
+                ...search,
+                signal: controller.signal,
+                onInfo: (info) => {
+                  latestInfo = info;
+                  sendEvent({ type: 'info', ...info });
+                },
+              });
+            }
+            const predictedMove = beginPonder(
+              search,
+              result.move,
+              latestInfo,
+            );
+            if (predictedMove) {
+              sendEvent({ type: 'ponder', move: predictedMove });
+            }
             sendEvent({ type: 'bestmove', move: result.move });
           } catch (error) {
             if (!response.destroyed) {
@@ -200,16 +313,46 @@ export async function startViewerServer({
         return;
       }
 
+      if (url.pathname === '/api/engine/stop') {
+        if (request.method !== 'POST') throw new HttpError(405, 'method not allowed');
+        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
+          throw new HttpError(415, 'content type must be application/json');
+        }
+        const body = await readJson(request);
+        if (
+          body === null ||
+          typeof body !== 'object' ||
+          Array.isArray(body) ||
+          typeof body.gameId !== 'string' ||
+          !/^[A-Za-z0-9._-]{1,128}$/.test(body.gameId)
+        ) {
+          throw new HttpError(400, 'gameId must be a bounded opaque identifier');
+        }
+        await withSearchTransition(async () => {
+          if (activeSearch?.gameId === body.gameId) {
+            activeSearch.controller.abort(new Error('engine game stopped'));
+            await activeSearch.done;
+          }
+          await stopPonder('engine game stopped', body.gameId);
+        });
+        writeJson(response, 200, { stopped: true });
+        return;
+      }
+
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         throw new HttpError(405, 'method not allowed');
       }
       const pathname = decodeURIComponent(url.pathname);
       const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
-      const filename = path.resolve(staticRoot, relative);
+      let filename = path.resolve(staticRoot, relative);
       if (filename !== staticRoot && !filename.startsWith(staticRoot + path.sep)) {
         throw new HttpError(403, 'forbidden');
       }
-      const metadata = await stat(filename);
+      let metadata = await stat(filename);
+      if (metadata.isDirectory()) {
+        filename = path.join(filename, 'index.html');
+        metadata = await stat(filename);
+      }
       if (!metadata.isFile()) throw new HttpError(404, 'not found');
       response.writeHead(200, {
         'Cache-Control': 'no-cache',
@@ -258,6 +401,7 @@ export async function startViewerServer({
     async close() {
       closing = true;
       activeSearch?.controller.abort(new Error('viewer server is closing'));
+      await stopPonder('viewer server is closing');
       const closed = new Promise((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());
       });

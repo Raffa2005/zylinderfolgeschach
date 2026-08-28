@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="The complete practical rules of Zylinderfolgeschach." />
+    <meta name="theme-color" content="#f4f5f2" />
+    <title>Rules · Kugelfisch</title>
+    <script>try{if(localStorage.getItem('zfs-theme')==='dark')document.documentElement.classList.add('dark')}catch(error){}</script>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body data-page="rules">
+    <a class="skip-link" href="#main">Skip to rules</a>
+    <header class="site-header">
+      <div class="site-shell header-inner">
+        <a class="brand" href="/" aria-label="Kugelfisch home"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/play">Play</a><a href="/games">Games</a><a href="/rules" aria-current="page">Rules</a>
+          <button class="icon-button ghost theme-button" type="button" aria-label="Use dark theme" title="Toggle color theme">◐</button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="site-shell page-main">
+      <div class="page-heading rules-heading">
+        <div>
+          <p class="eyebrow">Rules</p>
+          <h1>Zylinderfolgeschach.</h1>
+          <p>Ordinary chess, changed by cylindrical geometry and compulsory pursuit.</p>
+        </div>
+      </div>
+
+      <div class="rules-layout">
+        <nav class="rules-index" aria-label="Rules on this page">
+          <a href="#cylinder">01 · Cylinder</a>
+          <a href="#follow">02 · Follow</a>
+          <a href="#king">03 · King safety</a>
+          <a href="#special">04 · Special moves</a>
+          <a href="#ending">05 · Ending</a>
+        </nav>
+
+        <article class="rules-document">
+          <section id="cylinder">
+            <span class="rule-kicker">01</span>
+            <h2>The files form a cylinder.</h2>
+            <p>The left and right edges of the board are connected. Movement continues across the a/h seam exactly as if the board were wrapped into a cylinder.</p>
+            <div class="rule-example"><code>f1–g2–h3–a4–b5–c6–d7–e8</code><span>A bishop's complete diagonal on an empty board.</span></div>
+            <p>Every piece and special move uses this geometry, including knight moves, pawn captures, king attacks, and en passant.</p>
+          </section>
+
+          <section id="follow">
+            <span class="rule-kicker">02</span>
+            <h2>Follow when it is legal.</h2>
+            <p>After a move, the square that piece left is the <em>follow field</em>. If the opponent has at least one otherwise legal move whose destination is that square, the opponent must choose one of those moves.</p>
+            <p>If several pieces can follow, the player chooses among them. If no legal follower exists, every ordinary legal move is available.</p>
+          </section>
+
+          <section id="king">
+            <span class="rule-kicker">03</span>
+            <h2>King safety remains absolute.</h2>
+            <p>A move that leaves or places the moving side's king in check is never legal. An apparent follower that fails to resolve check does not count.</p>
+            <p>If a player is checked and a legal move to the follow field resolves that check, following is still compulsory. If no such follower exists, the player may choose any legal check evasion.</p>
+            <p>Attacks count even when the attacking move could not currently be selected because of the follow obligation.</p>
+          </section>
+
+          <section id="special">
+            <span class="rule-kicker">04</span>
+            <h2>Special moves remain.</h2>
+            <dl class="rule-definitions">
+              <div><dt>Castling</dt><dd>Uses the normal safety restrictions. Castling creates no follow field.</dd></div>
+              <div><dt>Promotion</dt><dd>A pawn that follows onto its last rank promotes normally.</dd></div>
+              <div><dt>En passant</dt><dd>Works normally and observes the cylindrical seam. The follow field is still the previous move's origin.</dd></div>
+            </dl>
+          </section>
+
+          <section id="ending">
+            <span class="rule-kicker">05</span>
+            <h2>Checkmate is the objective.</h2>
+            <p>Checkmate and stalemate are determined from the complete ZFS legal move set. Threefold repetition is an automatic draw, as is reaching 100 reversible halfmoves under the 50-move rule.</p>
+            <p>There is no claim procedure, separate fivefold rule, or 75-move rule.</p>
+            <div class="hero-actions"><a class="button" href="/play">Play the engine</a><a class="button secondary" href="/games">Review games</a></div>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-shell footer-inner"><span>Kugelfisch · Zylinderfolgeschach</span><div class="footer-links"><a href="/play">Play</a><a href="/games">Games</a><a href="https://github.com/Raffa2005/zylinderfolgeschach/blob/main/RULES.md">Normative specification</a></div></div>
+    </footer>
+    <script type="module" src="/site.js"></script>
+  </body>
+</html>

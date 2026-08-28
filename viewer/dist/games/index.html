@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Replay complete, verified Kugelfisch self-play games." />
+    <meta name="theme-color" content="#f4f5f2" />
+    <title>Games · Kugelfisch</title>
+    <script>try{if(localStorage.getItem('zfs-theme')==='dark')document.documentElement.classList.add('dark')}catch(error){}</script>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body data-page="games">
+    <a class="skip-link" href="#main">Skip to games</a>
+    <header class="site-header">
+      <div class="site-shell header-inner">
+        <a class="brand" href="/" aria-label="Kugelfisch home"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a href="/play">Play</a><a href="/games" aria-current="page">Games</a><a href="/rules">Rules</a>
+          <button class="icon-button ghost theme-button" type="button" aria-label="Use dark theme" title="Toggle color theme">◐</button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main" class="site-shell page-main archive-page">
+      <div class="page-heading">
+        <div>
+          <p class="eyebrow">Self-play archive</p>
+          <h1>Inspect complete games.</h1>
+          <p id="archive-summary">Loading the verified archive…</p>
+        </div>
+        <span id="archive-count" class="large-count">0 games</span>
+      </div>
+
+      <div class="archive-layout">
+        <div class="archive-board-column">
+          <div class="board-frame">
+            <span class="seam seam-left" aria-hidden="true">↔</span>
+            <div id="board" class="board" role="application" aria-label="Recorded Zylinderfolgeschach game"></div>
+            <span class="seam seam-right" aria-hidden="true">↔</span>
+          </div>
+          <div class="archive-position" aria-live="polite">
+            <strong id="archive-status">Starting position</strong>
+            <span id="archive-follow">No follow field</span>
+          </div>
+        </div>
+
+        <aside class="archive-console">
+          <section class="panel archive-picker">
+            <div class="panel-heading"><h2>Recorded game</h2><span id="archive-index" class="count">1 / 64</span></div>
+            <label class="visually-hidden" for="archive-game">Recorded game</label>
+            <select id="archive-game"></select>
+            <div class="compact-actions three">
+              <button id="archive-previous" class="secondary" type="button">← Previous</button>
+              <button id="archive-restart" type="button">Restart</button>
+              <button id="archive-next" class="secondary" type="button">Next →</button>
+            </div>
+          </section>
+
+          <section id="archive-meta" class="panel archive-meta"></section>
+
+          <section class="panel move-section">
+            <div class="panel-heading"><h2>Moves</h2><span id="ply-count" class="count">0 / 0</span></div>
+            <div id="history" class="history empty">No moves yet</div>
+            <div class="replay-controls" aria-label="Move navigation">
+              <button id="start-position" class="icon-button secondary" type="button" aria-label="Go to start">⇤</button>
+              <button id="back" class="icon-button secondary" type="button" aria-label="Previous move">←</button>
+              <button id="forward" class="icon-button secondary" type="button" aria-label="Next move">→</button>
+              <button id="end-position" class="icon-button secondary" type="button" aria-label="Go to end">⇥</button>
+            </div>
+          </section>
+
+          <button id="flip" class="secondary" type="button">Flip board</button>
+          <p id="error" class="message error" role="alert"></p>
+        </aside>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="site-shell footer-inner"><span>Kugelfisch · Zylinderfolgeschach</span><div class="footer-links"><a href="/play">Play</a><a href="/rules">Rules</a></div></div>
+    </footer>
+    <script type="module" src="/site.js"></script>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -113,8 +113,16 @@ export class UciEngineClient {
     return startupPromise;
   }
 
-  async search({ gameId, rootFen, moves, depth, signal, onInfo = () => {} }) {
-    const request = { gameId, rootFen, moves, depth, signal, onInfo };
+  async search({
+    gameId,
+    rootFen,
+    moves,
+    depth,
+    ponder = false,
+    signal,
+    onInfo = () => {},
+  }) {
+    const request = { gameId, rootFen, moves, depth, ponder, signal, onInfo };
     for (let attempt = 0; ; ++attempt) {
       try {
         return await this.searchOnce(request);
@@ -130,7 +138,7 @@ export class UciEngineClient {
     }
   }
 
-  async searchOnce({ gameId, rootFen, moves, depth, signal, onInfo }) {
+  async searchOnce({ gameId, rootFen, moves, depth, ponder, signal, onInfo }) {
     await this.start();
     if (signal?.aborted) throw asAbortError(signal.reason);
     if (this.currentSearch) throw new Error('engine search is already active');
@@ -150,6 +158,7 @@ export class UciEngineClient {
       abortReason: null,
       abortTimer: null,
       onInfo,
+      ponder,
       reject: rejectSearch,
       resolve: resolveSearch,
       result,
@@ -162,11 +171,20 @@ export class UciEngineClient {
     const position = `position zfsfen ${rootFen}` +
       (moves.length === 0 ? '' : ` moves ${moves.join(' ')}`);
     try {
-      this.write(`${position}\ngo depth ${depth}\n`);
+      this.write(`${position}\ngo${ponder ? ' ponder' : ''} depth ${depth}\n`);
     } catch (error) {
       this.finishSearch(search, false, error);
     }
     return result;
+  }
+
+  ponderHit() {
+    const search = this.currentSearch;
+    if (!search?.ponder || search.abortReason) {
+      throw new Error('engine has no active ponder search');
+    }
+    search.ponder = false;
+    this.write('ponderhit\n');
   }
 
   async close() {

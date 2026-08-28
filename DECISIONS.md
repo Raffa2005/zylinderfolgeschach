@@ -624,3 +624,23 @@ and their consequences, not the code line by line.
     the replay to return a legal move. On the development machine the Node
     viewer is an enabled user service with whole-service automatic restart, so
     it no longer depends on a Codex terminal session remaining attached.
+
+76. **The website separates explanation, play, and inspection.** The public
+    structure is a sparse landing page plus dedicated Play, Games, and Rules
+    routes with one shared header, theme control, and visual vocabulary. The
+    Bachelor project's hierarchy and interaction economy were used as a
+    read-only reference; no source, asset, runtime, or data was copied or
+    modified. Active play suppresses nonessential chrome, while setup exposes
+    only side and strength. ZFS-FEN remains available in a collapsed expert
+    panel, and the verified self-play archive keeps its own focused viewer.
+
+77. **Browser play uses bounded, single-worker PV pondering.** Depth 10 remains
+    the standard server option and there are no clocks. After each engine move,
+    the second move of the final PV is treated as a prediction and the same UCI
+    process searches the position after that reply with `go ponder depth N`.
+    Only an exact game token, root ZFS-FEN, depth, and complete move-prefix match
+    may issue `ponderhit`; a miss is stopped and drained before normal search.
+    Stop, navigation, replacement, page exit, and service shutdown share the
+    same serialized cancellation boundary. A hit immediately starts the next
+    prediction, so pondering continues across turns without ever creating a
+    second CPU-intensive search worker.

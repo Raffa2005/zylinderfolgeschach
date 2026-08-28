@@ -73,9 +73,20 @@ try {
   const pageResponse = await fetch(`${service.url}/`);
   assert.equal(pageResponse.status, 200);
   const page = await pageResponse.text();
-  assert.match(page, /Play against engine/);
-  assert.match(page, /Self-play archive/);
+  assert.match(page, /The board wraps/);
   assert.doesNotMatch(page, /Edge-case presets/);
+
+  const playResponse = await fetch(`${service.url}/play`);
+  assert.equal(playResponse.status, 200);
+  assert.match(await playResponse.text(), /Play against Kugelfisch/);
+
+  const gamesResponse = await fetch(`${service.url}/games/`);
+  assert.equal(gamesResponse.status, 200);
+  assert.match(await gamesResponse.text(), /Self-play archive/);
+
+  const rulesResponse = await fetch(`${service.url}/rules`);
+  assert.equal(rulesResponse.status, 200);
+  assert.match(await rulesResponse.text(), /Follow when it is legal/);
 
   const invalidResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',
@@ -96,6 +107,13 @@ try {
   });
   assert.equal(unsafeContentType.status, 415);
 
+  const unsafeStopContentType = await fetch(`${service.url}/api/engine/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: '{}',
+  });
+  assert.equal(unsafeStopContentType.status, 415);
+
   const searchResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -113,6 +131,33 @@ try {
     .map((line) => JSON.parse(line));
   assert.ok(events.some((event) => event.type === 'info' && event.depth === 2));
   assert.deepEqual(events.at(-1), { type: 'bestmove', move: 'a1a3' });
+  const ponderEvent = events.find((event) => event.type === 'ponder');
+  assert.match(ponderEvent?.move ?? '', /^[a-h][1-8][a-h][1-8][qrbn]?$/);
+
+  const ponderHitResponse = await fetch(`${service.url}/api/engine/move`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      gameId: 'forced-move',
+      rootFen: '7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3',
+      moves: ['a1a3', ponderEvent.move],
+      depth: 2,
+    }),
+  });
+  const ponderHitEvents = (await ponderHitResponse.text())
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  assert.ok(ponderHitEvents.some((event) => event.type === 'ponderhit'));
+  assert.ok(ponderHitEvents.some((event) => event.type === 'ponder'));
+  assert.equal(ponderHitEvents.at(-1).type, 'bestmove');
+
+  const stopResponse = await fetch(`${service.url}/api/engine/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gameId: 'forced-move' }),
+  });
+  assert.deepEqual(await stopResponse.json(), { stopped: true });
 
   const repetitionResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',

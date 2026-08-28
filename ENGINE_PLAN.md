@@ -127,6 +127,15 @@ An unexpected native-engine exit causes one transparent process restart and
 replay of the interrupted search. User cancellation is not retried, and the
 second failure is surfaced instead of creating a crash loop.
 
+The public surface is split into a sparse landing page and focused Play, Games,
+and Rules routes. Play defaults to the server engine at depth 10 without clocks.
+After an engine move, the service speculates on the second move of the final PV
+using the same UCI process in ponder mode. An exact game/root/depth/move-prefix
+match converts that work with `ponderhit`; a miss, game stop, navigation, page
+exit, or replacement request cancels it before any new search. A ponder hit
+starts the following ponder as well, so the lifecycle continues for the whole
+game while retaining the one-search-worker invariant.
+
 ## Verification gates already present
 
 - production rules tests and perft counts;
@@ -139,8 +148,9 @@ second failure is surfaced instead of creating a crash loop.
 - browser bridge draw/navigation tests and execution of the shipped WASM;
 - a check that the distribution embeds that tested WASM payload;
 - a localhost service test covering validation, streamed analysis, a
-  forced-follow `bestmove`, replayed threefold history, and serialized
-  cancellation/replacement, plus an actual mid-search engine kill and recovery;
+  forced-follow `bestmove`, repeated ponder-hit chaining, replayed threefold
+  history, and serialized cancellation/replacement, plus an actual mid-search
+  engine kill and recovery;
 - subprocess UCI handshake, analysis, automatic draw, parameter-boundary,
   ponder, and stop tests;
 - release plus ASan/UBSan runs.

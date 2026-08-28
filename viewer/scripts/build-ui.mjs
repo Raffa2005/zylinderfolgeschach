@@ -27,16 +27,28 @@ await build({
   target: 'es2022',
 });
 
-const sourceHtml = await readFile(
-  path.join(viewerDirectory, 'index.html'),
-  'utf8',
-);
-const outputHtml = sourceHtml.replace(
-  '    <script type="module" src="/src/main.js"></script>',
-  '    <link rel="stylesheet" href="/app.css" />\n' +
-    '    <script type="module" src="/app.js"></script>',
-);
-if (outputHtml === sourceHtml) {
-  throw new Error('index.html entry script was not found');
+await build({
+  entryPoints: [path.join(viewerDirectory, 'src/site.js')],
+  bundle: true,
+  format: 'esm',
+  legalComments: 'eof',
+  minify: true,
+  outfile: path.join(outputDirectory, 'site.js'),
+  platform: 'browser',
+  sourcemap: true,
+  target: 'es2022',
+});
+
+for (const [source, destination] of [
+  ['index.html', 'index.html'],
+  ['play.html', 'play/index.html'],
+  ['games.html', 'games/index.html'],
+  ['rules.html', 'rules/index.html'],
+]) {
+  const output = path.join(outputDirectory, destination);
+  await mkdir(path.dirname(output), { recursive: true });
+  await writeFile(
+    output,
+    await readFile(path.join(viewerDirectory, source), 'utf8'),
+  );
 }
-await writeFile(path.join(outputDirectory, 'index.html'), outputHtml);
