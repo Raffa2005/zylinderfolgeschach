@@ -64,6 +64,7 @@ const engineModule = await createKugelfischEngine();
 const engineSearch = engineModule.cwrap(
   'zfs_engine_search', 'string', ['string', 'string', 'number'],
 );
+const engineNewGame = engineModule.cwrap('zfs_engine_new_game', null, []);
 const forcedSearch = JSON.parse(engineSearch(
   '7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3', '', 2,
 ));
@@ -71,6 +72,16 @@ requireCondition(
   forcedSearch.ok === true && forcedSearch.move === 'a1a3' &&
     forcedSearch.info.depth === 2 && forcedSearch.info.pv[0] === 'a1a3',
   'generated search WASM failed its forced-follow search',
+);
+
+engineNewGame();
+const provenMate = JSON.parse(engineSearch(
+  '8/8/8/8/8/K7/2Q5/k7 w - - 0 1 -', '', 10,
+));
+requireCondition(
+  provenMate.ok === true && provenMate.move === 'c2c1' &&
+    provenMate.info.score.kind === 'mate' && provenMate.info.depth === 1,
+  'generated search WASM continued beyond a proven root mate',
 );
 
 const archive = JSON.parse(await fs.readFile(
@@ -133,6 +144,18 @@ const cloudflareRoutes = JSON.parse(await fs.readFile(
   new URL('../viewer/dist/_routes.json', import.meta.url),
   'utf8',
 ));
+const cloudflareRedirects = await fs.readFile(
+  new URL('../viewer/dist/_redirects', import.meta.url),
+  'utf8',
+);
+const playPage = await fs.readFile(
+  new URL('../viewer/dist/play/index.html', import.meta.url),
+  'utf8',
+);
+const analysisPage = await fs.readFile(
+  new URL('../viewer/dist/analysis/index.html', import.meta.url),
+  'utf8',
+);
 const generatedHash = createHash('sha256').update(generated).digest('hex');
 const engineHash = createHash('sha256').update(engineGenerated).digest('hex');
 requireCondition(
@@ -155,6 +178,18 @@ requireCondition(distribution.includes('/engine-worker.js'),
                  'distribution lacks the client engine worker');
 requireCondition(!distribution.includes('/api/engine/'),
                  'distribution still depends on the server engine');
+requireCondition(!distribution.includes('scrollIntoView'),
+                 'distribution can still scroll the page when history changes');
+requireCondition(
+  /id="engine-depth"[^>]*>.*value="9" selected/.test(playPage) &&
+    /id="analysis-depth"[^>]*>.*value="9" selected/.test(analysisPage),
+  'fresh browser sessions do not default to depth 9',
+);
+requireCondition(
+  cloudflareRedirects.trim() ===
+    '/games/:id/ /games/ 200\n/games/:id /games/ 200',
+  'Cloudflare does not rewrite saved-game detail routes',
+);
 requireCondition(
   cloudflareRoutes.version === 1 &&
     cloudflareRoutes.include.length === 1 &&

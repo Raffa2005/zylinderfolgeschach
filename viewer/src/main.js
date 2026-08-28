@@ -175,7 +175,14 @@ function renderMoveHistory(container, state, onSelect) {
     button.addEventListener('click', () => onSelect(index + 1));
     container.append(button);
   });
-  current?.scrollIntoView({ block: 'nearest' });
+  if (!current) return;
+  const top = current.offsetTop;
+  const bottom = top + current.offsetHeight;
+  if (top < container.scrollTop) {
+    container.scrollTop = top;
+  } else if (bottom > container.scrollTop + container.clientHeight) {
+    container.scrollTop = bottom - container.clientHeight;
+  }
 }
 
 function navigateState(state, cursor) {
@@ -249,7 +256,7 @@ async function initializePlay() {
   let saveChain = Promise.resolve();
   const playingEngine = new PlayingEngine();
   const engine = {
-    available: false, controller: null, createdAt: 0, depth: 10, enabled: false,
+    available: false, controller: null, createdAt: 0, depth: 9, enabled: false,
     gameId: null, humanColor: 'white', message: 'Ready', pondering: false,
     requestSerial: 0, thinking: false,
   };

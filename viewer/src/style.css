@@ -277,6 +277,7 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 .full-button { width: 100%; margin-top: 22px; }
 
 .engine-switch {
+  position: relative;
   min-height: 42px;
   display: inline-flex;
   align-items: center;
@@ -286,7 +287,16 @@ legend, .field > label { display: block; margin-bottom: 8px; }
   font-size: 12px;
   font-weight: 750;
 }
-.engine-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.engine-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .switch-track {
   width: 42px;
   height: 24px;
@@ -405,6 +415,7 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 
 .move-section { min-height: 170px; }
 .history {
+  position: relative;
   max-height: 190px;
   margin-top: 13px;
   overflow: auto;

@@ -10,7 +10,7 @@ import {
   validateSavedGame,
 } from '../shared/saved-games.mjs';
 
-export const DEFAULT_ENGINE_DEPTH = 10;
+export const DEFAULT_ENGINE_DEPTH = 9;
 
 const contentTypes = new Map([
   ['.css', 'text/css; charset=utf-8'],

@@ -191,11 +191,11 @@ public:
             if (external_stop() || hard_limit_reached()) {
                 break;
             }
-            if (limits_.mate > 0 && std::abs(score) >= kMateThreshold) {
-                const int plies = kMateScore - std::abs(score);
-                if (plies <= 2 * limits_.mate) {
-                    break;
-                }
+            // A completed root iteration returns an exact score. Once it has
+            // proved mate, deeper iterations can only refine the distance; they
+            // cannot improve the game-theoretic result.
+            if (std::abs(score) >= kMateThreshold) {
+                break;
             }
         }
 

@@ -15,6 +15,7 @@ import {
 
 const enginePath = process.argv[2];
 assert.ok(enginePath, 'expected the zfs_engine path as argv[2]');
+assert.equal(DEFAULT_ENGINE_DEPTH, 9);
 
 assert.deepEqual(
   parseInfoLine(
@@ -92,6 +93,7 @@ try {
   const playPage = await playResponse.text();
   assert.match(playPage, /<h1>New game<\/h1>/);
   assert.match(playPage, /id="resign"/);
+  assert.match(playPage, /value="9" selected>Depth 9/);
   assert.doesNotMatch(playPage, /engine-score|engine-pv|analysis-fen|ZFS-FEN/);
   assert.doesNotMatch(playPage, /Online|Offline|Connecting/);
 
@@ -116,6 +118,7 @@ try {
   assert.match(analysisPage, /analysis-pv/);
   assert.match(analysisPage, /analysis-fen/);
   assert.match(analysisPage, /id="analysis-toggle" type="checkbox" checked/);
+  assert.match(analysisPage, /value="9" selected>Depth 9/);
   assert.doesNotMatch(analysisPage, /Online|Offline|Connecting/);
 
   const initialGame = {

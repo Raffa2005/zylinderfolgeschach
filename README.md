@@ -150,7 +150,7 @@ npm run play
 
 Open the local URL printed by the command. The dark, compact interface has
 focused Play, Games, and Analysis sections. Play offers only side and strength;
-there are no clocks and depth 10 is the default. Legal destinations, the follow
+there are no clocks and depth 9 is the default. Legal destinations, the follow
 field, and move history remain visible, while score, nodes, principal variation,
 and arbitrary-position loading are deliberately absent. Left/Right review the
 move line without allowing a historical position to fork the played game;

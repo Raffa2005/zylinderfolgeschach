@@ -108,10 +108,11 @@ void compare_with_reference(std::string_view fen, int depth) {
 
 void test_mate_and_material() {
     const auto mate = search(
-        zfs::Game(load("8/8/8/8/8/K7/2Q5/k7 w - - 0 1 -")), 1);
+        zfs::Game(load("8/8/8/8/8/K7/2Q5/k7 w - - 0 1 -")), 10);
     CHECK(mate.has_move);
     CHECK(mate.best_move.uci() == "c2c1");
     CHECK(mate.score >= zfs::engine::kMateThreshold);
+    CHECK(mate.depth == 1);
 
     const auto capture = search(
         zfs::Game(load("4k3/8/8/8/8/8/r7/R3K3 w - - 0 1 -")), 1);

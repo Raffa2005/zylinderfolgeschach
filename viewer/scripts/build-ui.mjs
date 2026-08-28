@@ -42,6 +42,7 @@ for (const [source, destination] of [
   ['games.html', 'games/index.html'],
   ['analysis.html', 'analysis/index.html'],
   ['mark.svg', 'mark.svg'],
+  ['_redirects', '_redirects'],
   ['_routes.json', '_routes.json'],
 ]) {
   const output = path.join(outputDirectory, destination);

@@ -633,8 +633,9 @@ and their consequences, not the code line by line.
     turn/follow state, and move navigation. ZFS-FEN, score, nodes, depth, and PV
     exist only in Analysis.
 
-77. **Browser play uses bounded, single-worker PV pondering.** Depth 10 remains
-    the standard server option and there are no clocks. After each engine move,
+77. **Browser play uses bounded, single-worker PV pondering.** Depth 10 was the
+    standard server option when pondering was introduced; decision 96 changes
+    only the fresh-session default. There are no clocks. After each engine move,
     the second move of the final PV is treated as a prediction and the same UCI
     process searches the position after that reply with `go ponder depth N`.
     Only an exact game token, root ZFS-FEN, depth, and complete move-prefix match
@@ -774,3 +775,47 @@ and their consequences, not the code line by line.
     and keeps its existing JSON database; deployment does not make the laptop an
     origin server. Cloudflare OAuth credentials and account resources are never
     committed.
+
+94. **Saved-game detail URLs are static rewrites, not an accidental SPA
+    fallback.** Cloudflare Pages has one physical Games document, while game IDs
+    are client-side detail routes. Checked-in `_redirects` proxy rules serve
+    that document for the one-segment `/games/:id` forms; the existing ID parser
+    then loads the public D1 record. The route remains outside Pages Functions,
+    and the intentionally public archive and API policy are unchanged.
+
+95. **Move-history visibility never scrolls the page.** Rebuilding a move list
+    previously called `scrollIntoView` for its current move. On the stacked
+    mobile layout, the history is below the board, so each move—and every
+    iterative analysis update—panned the visual viewport toward it. History now
+    adjusts only its own `scrollTop`. The analysis switch's transparent input is
+    also constrained to one pixel rather than inheriting the global 100-percent
+    input width, eliminating an unrelated horizontal overflow without changing
+    the responsive board calculation or keyboard focus behavior.
+
+96. **Fresh Play and Analysis sessions default to depth 9.** The selected HTML
+    options, Play's state initialization, and the legacy local-server fallback
+    all agree on 9. Depth remains a user selection; 8, 10, 12, and Analysis 14
+    remain available. Saved games continue recording the actually selected
+    depth, so no historical data is rewritten. This supersedes the defaults in
+    decisions 48 and 77, not their search-lifecycle decisions.
+
+97. **Play's `g6` and Analysis's `Nc6` after `Nf3` are cache history, not
+    different positions or nondeterminism.** With an explicitly cleared 32 MiB
+    WASM table, depth 10 returns `g7g6`, -398 cp, and 3,318,320 nodes. Searching
+    the start position first and retaining its table returns `b8c6`, the same
+    -398 cp, and 4,273,350 nodes. Play's first reply starts a new game and clears
+    the table; Analysis normally retains the completed start-position analysis.
+    Clearing Analysis on every move would throw away valid TT reuse merely to
+    force a cosmetic tie-break, so the two equal-score choices remain. Given
+    identical table state, native and WASM searches remain deterministic as in
+    decision 88.
+
+98. **A completed exact root mate ends iterative deepening at once.** A mate
+    score after a completed full root iteration proves the game-theoretic result;
+    later depths can only refine mate distance. Fixed-depth, time, node, and UCI
+    searches therefore return that move immediately instead of continuing to
+    the nominal depth. No centipawn threshold receives the same treatment:
+    positions measured around +29 to +31 pawns still ranged from 0.6 to 5.6
+    million depth-10 nodes, but a large evaluation is not a proof and cutting it
+    off would be a strength change. The pending reported position can be
+    profiled without weakening this boundary.
