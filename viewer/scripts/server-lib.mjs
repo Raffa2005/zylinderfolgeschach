@@ -531,9 +531,9 @@ export async function startViewerServer({
   const url = `http://${host}:${address.port}`;
   if (!quiet) {
     console.log(`ZFS viewer: ${url}`);
-    console.log(engineAvailable
-      ? `Engine: ${resolvedEngine} (default depth ${DEFAULT_ENGINE_DEPTH})`
-      : `Engine unavailable: ${resolvedEngine}`);
+    console.log(
+      `Browser engine: client WebAssembly (default depth ${DEFAULT_ENGINE_DEPTH})`,
+    );
   }
 
   return {
