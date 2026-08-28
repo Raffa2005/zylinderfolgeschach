@@ -37,3 +37,32 @@ exported_functions='["_zfs_reset","_zfs_load","_zfs_play","_zfs_back","_zfs_forw
     -sEXPORTED_FUNCTIONS="${exported_functions}" \
     -sEXPORTED_RUNTIME_METHODS='["cwrap"]' \
     -o "${viewer_dir}/src/generated/zfs.js"
+
+engine_exports='["_zfs_engine_new_game","_zfs_engine_search"]'
+
+"${compiler}" \
+    -std=c++20 -O3 -flto -DNDEBUG -fno-rtti \
+    -I"${project_dir}/include" \
+    -I"${project_dir}" \
+    "${project_dir}/src/attacks.cpp" \
+    "${project_dir}/src/game.cpp" \
+    "${project_dir}/src/position.cpp" \
+    "${project_dir}/engine/evaluate.cpp" \
+    "${project_dir}/engine/search.cpp" \
+    "${project_dir}/engine/tt.cpp" \
+    "${viewer_dir}/wasm/engine_bridge.cpp" \
+    --no-entry \
+    -sMODULARIZE=1 \
+    -sEXPORT_ES6=1 \
+    -sEXPORT_NAME=createKugelfischEngine \
+    -sENVIRONMENT=web,worker \
+    -sFILESYSTEM=0 \
+    -sSINGLE_FILE=1 \
+    -sALLOW_MEMORY_GROWTH=1 \
+    -sINITIAL_MEMORY=67108864 \
+    -sMAXIMUM_MEMORY=536870912 \
+    -sSTACK_SIZE=1048576 \
+    -sASSERTIONS=0 \
+    -sEXPORTED_FUNCTIONS="${engine_exports}" \
+    -sEXPORTED_RUNTIME_METHODS='["cwrap"]' \
+    -o "${viewer_dir}/src/generated/kugelfisch-engine.js"

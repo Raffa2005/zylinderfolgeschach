@@ -3,6 +3,7 @@ import '@lichess-org/chessground/assets/chessground.base.css';
 import '@lichess-org/chessground/assets/chessground.brown.css';
 import '@lichess-org/chessground/assets/chessground.cburnett.css';
 import createZfsModule from './generated/zfs.js';
+import { ClientEngine, PlayingEngine } from './client-engine.js';
 import './style.css';
 
 const module = await createZfsModule();
@@ -215,54 +216,6 @@ function choosePromotion(dialog, choices, cancel, candidates) {
   });
 }
 
-async function readEngineEvents(response, onEvent) {
-  if (!response.body) throw new Error('engine response has no body');
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let pending = '';
-  let bestMove;
-  for (;;) {
-    const { done, value } = await reader.read();
-    pending += decoder.decode(value, { stream: !done });
-    let newline;
-    while ((newline = pending.indexOf('\n')) >= 0) {
-      consume(pending.slice(0, newline));
-      pending = pending.slice(newline + 1);
-    }
-    if (done) break;
-  }
-  consume(pending);
-  return bestMove;
-
-  function consume(line) {
-    if (!line.trim()) return;
-    const event = JSON.parse(line);
-    if (event.type === 'error') throw new Error(event.message || 'engine search failed');
-    if (event.type === 'bestmove') bestMove = event.move;
-    onEvent(event);
-  }
-}
-
-async function requestEngineStop(gameId, keepalive = false) {
-  if (!gameId) return;
-  await fetch('/api/engine/stop', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gameId }),
-    keepalive,
-  }).catch(() => {});
-}
-
-function postEngineStop(gameId) {
-  void requestEngineStop(gameId, true);
-}
-
-async function engineStatus() {
-  const response = await fetch('/api/engine/status', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`engine service returned HTTP ${response.status}`);
-  return response.json();
-}
-
 async function initializePlay() {
   const element = (id) => document.getElementById(id);
   const elements = {
@@ -274,8 +227,8 @@ async function initializePlay() {
     live: element('live-position'), newGame: element('new-game'), ply: element('ply-count'),
     positionCard: element('position-card'),
     promotionChoices: element('promotion-choices'), promotionDialog: element('promotion-dialog'),
-    setupConnection: element('setup-connection'), setupForm: element('setup-form'),
-    setupMessage: element('setup-message'), setupView: element('setup-view'),
+    setupForm: element('setup-form'), setupMessage: element('setup-message'),
+    setupView: element('setup-view'),
     start: element('start-game'), startPosition: element('start-position'),
     status: element('status'), statusDetail: element('status-detail'),
     topMeta: element('top-player-meta'), topName: element('top-player'),
@@ -288,10 +241,11 @@ async function initializePlay() {
   let orientation = 'white';
   let inputLocked = false;
   let saveChain = Promise.resolve();
+  const playingEngine = new PlayingEngine();
   const engine = {
     available: false, controller: null, createdAt: 0, depth: 10, enabled: false,
     gameId: null, humanColor: 'white', message: 'Ready', pondering: false,
-    requestSerial: 0, stopPromise: Promise.resolve(), thinking: false,
+    requestSerial: 0, thinking: false,
   };
 
   function ensureBoard() {
@@ -386,7 +340,7 @@ async function initializePlay() {
 
   function stopGame(message) {
     cancelSearch();
-    postEngineStop(engine.gameId);
+    void playingEngine.stopPonder();
     engine.enabled = false;
     engine.pondering = false;
     engine.message = message;
@@ -396,27 +350,20 @@ async function initializePlay() {
     cancelSearch();
     engine.pondering = false;
     engine.message = message;
-    engine.stopPromise = requestEngineStop(engine.gameId);
-    await engine.stopPromise;
+    await playingEngine.stopPonder();
   }
 
   async function connect() {
     try {
-      const status = await engineStatus();
-      engine.available = status.available === true;
-      if (Number.isInteger(status.defaultDepth)) {
-        const option = [...elements.depth.options].find((entry) =>
-          Number(entry.value) === status.defaultDepth,
-        );
-        if (option) elements.depth.value = option.value;
-      }
+      await playingEngine.start();
+      engine.available = true;
     } catch (error) {
       engine.available = false;
       elements.setupMessage.textContent = error instanceof Error ? error.message : String(error);
     }
-    elements.setupConnection.textContent = engine.available ? 'Online' : 'Offline';
-    elements.setupConnection.className = `connection ${engine.available ? 'online' : 'offline'}`;
-    elements.setupMessage.textContent = engine.available ? 'Engine ready.' : elements.setupMessage.textContent;
+    elements.setupMessage.textContent = engine.available
+      ? 'Engine ready on this device.'
+      : elements.setupMessage.textContent;
     elements.start.disabled = !engine.available;
   }
 
@@ -459,7 +406,7 @@ async function initializePlay() {
     if (!engine.enabled || engine.thinking || state.turn === engine.humanColor ||
         state.terminal !== 'ongoing') {
       if (engine.enabled && state.terminal !== 'ongoing') {
-        postEngineStop(engine.gameId);
+        void playingEngine.stopPonder();
         engine.enabled = false;
         engine.message = 'Game over';
       } else if (engine.enabled && !engine.thinking) {
@@ -476,30 +423,23 @@ async function initializePlay() {
     engine.message = 'Thinking';
     render();
     try {
-      const response = await fetch('/api/engine/move', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId: engine.gameId, rootFen,
-          moves: state.history.slice(0, state.historyCursor), depth: engine.depth,
-        }),
+      const result = await playingEngine.search({
+        gameId: engine.gameId,
+        rootFen,
+        moves: state.history.slice(0, state.historyCursor),
+        depth: engine.depth,
         signal: controller.signal,
+        onInfo: () => {},
       });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || `engine service returned HTTP ${response.status}`);
-      }
-      let pondering = false;
-      const bestMove = await readEngineEvents(response, (event) => {
-        if (event.type === 'ponder') pondering = true;
-      });
+      const bestMove = result.move;
       if (requestSerial !== engine.requestSerial || !engine.enabled) return;
       if (!bestMove || bestMove === '0000' || !api.play(bestMove)) {
         throw new Error(`engine returned an invalid move: ${bestMove ?? 'none'}`);
       }
       engine.controller = null;
       engine.thinking = false;
-      engine.pondering = pondering;
-      engine.message = pondering ? 'Pondering' : 'Your move';
+      engine.pondering = result.pondering;
+      engine.message = result.pondering ? 'Pondering' : 'Your move';
       sync();
       saveGame();
       void maybeEngineMove();
@@ -507,7 +447,7 @@ async function initializePlay() {
       if (requestSerial !== engine.requestSerial) return;
       engine.controller = null;
       engine.thinking = false;
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error?.name === 'AbortError') return;
       engine.enabled = false;
       engine.message = 'Engine stopped';
       elements.error.textContent = error instanceof Error ? error.message : String(error);
@@ -569,7 +509,7 @@ async function initializePlay() {
       navigateTo(state.historyCursor + (event.key === 'ArrowLeft' ? -1 : 1));
     }
   });
-  window.addEventListener('pagehide', () => postEngineStop(engine.gameId));
+  window.addEventListener('pagehide', () => playingEngine.close());
   await connect();
 }
 
@@ -742,10 +682,10 @@ async function initializeAnalysis() {
   const element = (id) => document.getElementById(id);
   const elements = {
     back: element('analysis-back'), board: element('analysis-board'),
-    cancelPromotion: element('analysis-cancel-promotion'), connection: element('analysis-connection'),
+    cancelPromotion: element('analysis-cancel-promotion'),
     copy: element('analysis-copy'), depth: element('analysis-depth'),
     depthReadout: element('analysis-depth-readout'), end: element('analysis-end'),
-    engineState: element('analysis-engine-state'), engineStatus: element('analysis-engine-status'),
+    engineStatus: element('analysis-engine-status'),
     error: element('analysis-error'), fen: element('analysis-fen'), flip: element('analysis-flip'),
     forward: element('analysis-forward'), history: element('analysis-history'),
     load: element('analysis-load'), nodes: element('analysis-nodes'),
@@ -766,13 +706,13 @@ async function initializeAnalysis() {
   let controller;
   let serial = 0;
   let analysis;
-  let message = 'Ready';
-  let gameId = newId('analysis');
-  let stopPromise = Promise.resolve();
+  let analysisChain = Promise.resolve();
+  let message = 'Loading engine';
+  const analysisEngine = new ClientEngine();
   const ground = createBoard(elements.board, state, onBoardMove);
 
   function canMove() {
-    return !inputLocked && !controller && state.terminal === 'ongoing';
+    return !inputLocked && state.terminal === 'ongoing';
   }
 
   function render() {
@@ -786,7 +726,7 @@ async function initializeAnalysis() {
       : `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
     elements.positionCard.classList.toggle('terminal', terminal);
     elements.turnDot.className = `turn-dot ${state.turn}`;
-    elements.fen.value = state.fen;
+    if (document.activeElement !== elements.fen) elements.fen.value = state.fen;
     elements.engineStatus.textContent = message;
     elements.score.textContent = formatScore(analysis?.score, state.turn);
     elements.depthReadout.textContent = analysis?.depth === undefined ? 'Depth —' : `Depth ${analysis.depth}`;
@@ -794,8 +734,7 @@ async function initializeAnalysis() {
     const uci = analysis?.pv?.join(' ') ?? '';
     const san = uci ? api.lineSan(uci) : '';
     elements.pv.textContent = san || uci || 'No line.';
-    elements.toggle.textContent = controller ? 'Stop' : 'Analyze';
-    elements.toggle.disabled = !available || state.terminal !== 'ongoing';
+    elements.toggle.disabled = !available;
     elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;
     renderMoveHistory(elements.history, state, navigateTo);
     elements.start.disabled = inputLocked || state.historyCursor === 0;
@@ -804,12 +743,12 @@ async function initializeAnalysis() {
     elements.end.disabled = inputLocked || state.historyCursor === state.history.length;
   }
 
-  function cancelAnalysis(nextMessage = 'Ready', keepalive = false) {
-    const wasRunning = Boolean(controller);
+  function cancelAnalysis(
+    nextMessage = elements.toggle.checked ? 'Ready' : 'Paused',
+  ) {
     ++serial;
     controller?.abort();
     controller = undefined;
-    if (wasRunning) stopPromise = requestEngineStop(gameId, keepalive);
     message = nextMessage;
   }
 
@@ -818,53 +757,63 @@ async function initializeAnalysis() {
     analysis = undefined;
     state = readState();
     render();
+    scheduleAnalysis();
   }
 
   async function runAnalysis() {
-    if (controller) {
-      cancelAnalysis('Stopped');
-      render();
-      return;
-    }
-    await stopPromise;
-    if (controller) return;
+    if (!available || !elements.toggle.checked || controller ||
+        state.terminal !== 'ongoing') return;
     const searchController = new AbortController();
     const requestSerial = ++serial;
     controller = searchController;
     analysis = undefined;
     message = 'Analyzing';
+    elements.error.textContent = '';
     render();
     try {
-      const response = await fetch('/api/engine/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gameId, rootFen, moves: state.history.slice(0, state.historyCursor),
-          depth: Number(elements.depth.value),
-        }),
+      const result = await analysisEngine.search({
+        rootFen,
+        moves: state.history.slice(0, state.historyCursor),
+        depth: Number(elements.depth.value),
         signal: searchController.signal,
-      });
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || `engine service returned HTTP ${response.status}`);
-      }
-      await readEngineEvents(response, (event) => {
-        if (event.type === 'info' && requestSerial === serial) {
-          analysis = event;
-          render();
-        }
+        onInfo: (info) => {
+          if (requestSerial === serial) {
+            analysis = info;
+            render();
+          }
+        },
       });
       if (requestSerial !== serial) return;
+      analysis = result.info ?? analysis;
       controller = undefined;
       message = 'Complete';
       render();
     } catch (error) {
       if (requestSerial !== serial) return;
       controller = undefined;
-      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error?.name === 'AbortError') return;
       message = 'Stopped';
       elements.error.textContent = error instanceof Error ? error.message : String(error);
       render();
     }
+  }
+
+  function scheduleAnalysis() {
+    if (!available || !elements.toggle.checked ||
+        state.terminal !== 'ongoing') return;
+    const scheduledSerial = serial;
+    analysisChain = analysisChain.then(() => {
+      if (scheduledSerial !== serial || !elements.toggle.checked ||
+          state.terminal !== 'ongoing') return undefined;
+      return runAnalysis();
+    });
+  }
+
+  function restartAnalysis() {
+    cancelAnalysis();
+    analysis = undefined;
+    render();
+    scheduleAnalysis();
   }
 
   async function onBoardMove(origin, destination) {
@@ -893,6 +842,7 @@ async function initializeAnalysis() {
     analysis = undefined;
     elements.error.textContent = accepted ? '' : api.error();
     render();
+    scheduleAnalysis();
   }
 
   function loadRoot(fen) {
@@ -904,10 +854,10 @@ async function initializeAnalysis() {
     }
     state = readState();
     rootFen = state.fen;
-    gameId = newId('analysis');
     analysis = undefined;
     elements.error.textContent = '';
     render();
+    scheduleAnalysis();
     return true;
   }
 
@@ -932,7 +882,16 @@ async function initializeAnalysis() {
     render();
   }
 
-  elements.toggle.addEventListener('click', runAnalysis);
+  elements.toggle.addEventListener('change', () => {
+    if (elements.toggle.checked) {
+      message = 'Ready';
+      scheduleAnalysis();
+    } else {
+      cancelAnalysis('Paused');
+      render();
+    }
+  });
+  elements.depth.addEventListener('change', restartAnalysis);
   elements.flip.addEventListener('click', () => {
     orientation = orientation === 'white' ? 'black' : 'white';
     ground.toggleOrientation();
@@ -941,7 +900,6 @@ async function initializeAnalysis() {
     api.reset();
     state = readState();
     rootFen = state.fen;
-    gameId = newId('analysis');
     elements.source.hidden = true;
     changedPosition();
   });
@@ -966,16 +924,14 @@ async function initializeAnalysis() {
       navigateTo(state.historyCursor + (event.key === 'ArrowLeft' ? -1 : 1));
     }
   });
-  window.addEventListener('pagehide', () => cancelAnalysis('Ready', true));
+  window.addEventListener('pagehide', () => analysisEngine.close());
   try {
-    const status = await engineStatus();
-    available = status.available === true;
-    elements.connection.textContent = available ? 'Online' : 'Offline';
-    elements.engineState.textContent = available ? 'Online' : 'Offline';
-    elements.connection.className = `connection ${available ? 'online' : 'offline'}`;
-    elements.engineState.className = `connection ${available ? 'online' : 'offline'}`;
+    await analysisEngine.start();
+    available = true;
+    message = 'Ready';
   } catch (error) {
     elements.error.textContent = error instanceof Error ? error.message : String(error);
+    message = 'Engine unavailable';
   }
   render();
   const savedGame = new URLSearchParams(location.search).get('game');
@@ -985,6 +941,8 @@ async function initializeAnalysis() {
     } catch (error) {
       elements.error.textContent = error instanceof Error ? error.message : String(error);
     }
+  } else {
+    scheduleAnalysis();
   }
 }
 

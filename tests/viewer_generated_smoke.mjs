@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
 import createZfsModule from '../viewer/src/generated/zfs.js';
+import createKugelfischEngine from '../viewer/src/generated/kugelfisch-engine.js';
 
 const module = await createZfsModule();
 const reset = module.cwrap('zfs_reset', null, []);
@@ -59,6 +60,19 @@ requireCondition(play('g1f3') === 1, 'generated WASM rejected quiet move');
 requireCondition(JSON.parse(state()).terminal === 'fifty-move',
                  'generated WASM missed fifty-move draw');
 
+const engineModule = await createKugelfischEngine();
+const engineSearch = engineModule.cwrap(
+  'zfs_engine_search', 'string', ['string', 'string', 'number'],
+);
+const forcedSearch = JSON.parse(engineSearch(
+  '7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3', '', 2,
+));
+requireCondition(
+  forcedSearch.ok === true && forcedSearch.move === 'a1a3' &&
+    forcedSearch.info.depth === 2 && forcedSearch.info.pv[0] === 'a1a3',
+  'generated search WASM failed its forced-follow search',
+);
+
 const archive = JSON.parse(await fs.readFile(
   new URL('../viewer/src/selfplay-games.json', import.meta.url),
   'utf8',
@@ -108,10 +122,22 @@ const distribution = await fs.readFile(
   new URL('../viewer/dist/app.js', import.meta.url),
   'utf8',
 );
+const engineGenerated = await fs.readFile(
+  new URL('../viewer/src/generated/kugelfisch-engine.js', import.meta.url),
+);
+const engineDistribution = await fs.readFile(
+  new URL('../viewer/dist/engine-worker.js', import.meta.url),
+  'utf8',
+);
 const generatedHash = createHash('sha256').update(generated).digest('hex');
+const engineHash = createHash('sha256').update(engineGenerated).digest('hex');
 requireCondition(
   distribution.includes(`zfs-wasm-sha256:${generatedHash}`),
   'distribution embeds a stale generated WASM module',
+);
+requireCondition(
+  engineDistribution.includes(`kugelfisch-engine-wasm-sha256:${engineHash}`),
+  'distribution embeds a stale search WASM module',
 );
 requireCondition(distribution.includes('threefold'),
                  'distribution lacks threefold rendering');
@@ -119,7 +145,9 @@ requireCondition(distribution.includes('fifty-move'),
                  'distribution lacks fifty-move rendering');
 requireCondition(distribution.includes('/api/games'),
                  'distribution lacks saved-game support');
-requireCondition(distribution.includes('/api/engine/analyze'),
-                 'distribution lacks the analysis endpoint');
+requireCondition(distribution.includes('/engine-worker.js'),
+                 'distribution lacks the client engine worker');
+requireCondition(!distribution.includes('/api/engine/'),
+                 'distribution still depends on the server engine');
 
 console.log('generated viewer runtime passed');

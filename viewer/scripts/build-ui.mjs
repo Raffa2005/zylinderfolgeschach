@@ -9,19 +9,28 @@ const outputDirectory = path.join(viewerDirectory, 'dist');
 const generatedModule = await readFile(
   path.join(viewerDirectory, 'src/generated/zfs.js'),
 );
+const generatedEngine = await readFile(
+  path.join(viewerDirectory, 'src/generated/kugelfisch-engine.js'),
+);
 const generatedModuleHash = createHash('sha256')
   .update(generatedModule)
+  .digest('hex');
+const generatedEngineHash = createHash('sha256')
+  .update(generatedEngine)
   .digest('hex');
 
 await mkdir(outputDirectory, { recursive: true });
 await build({
-  banner: { js: `/* zfs-wasm-sha256:${generatedModuleHash} */` },
-  entryPoints: [path.join(viewerDirectory, 'src/main.js')],
+  banner: { js: `/* zfs-wasm-sha256:${generatedModuleHash}; kugelfisch-engine-wasm-sha256:${generatedEngineHash} */` },
+  entryPoints: {
+    app: path.join(viewerDirectory, 'src/main.js'),
+    'engine-worker': path.join(viewerDirectory, 'src/engine-worker.js'),
+  },
   bundle: true,
   format: 'esm',
   legalComments: 'eof',
   minify: true,
-  outfile: path.join(outputDirectory, 'app.js'),
+  outdir: outputDirectory,
   platform: 'browser',
   sourcemap: true,
   target: 'es2022',

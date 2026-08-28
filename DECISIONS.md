@@ -684,3 +684,41 @@ and their consequences, not the code line by line.
     and the product descriptor is the literal
     “Zylinderfolgeschach-Engine”—branding does not introduce another rules page
     or marketing copy.
+
+83. **The public engine is the production C++ engine compiled to WebAssembly.**
+    The worker payload links the existing Position, Game, evaluation, Searcher,
+    and transposition-table sources; JavaScript provides transport and lifecycle
+    only. Each request supplies the root ZFS-FEN and complete move prefix, so
+    repetition semantics are unchanged. A generated-payload test executes a
+    forced-follow search and the distribution test rejects any remaining
+    `/api/engine` dependency.
+
+84. **Browser search remains single-threaded and uses worker termination as
+    cancellation.** One dedicated worker owns a 32 MiB TT. Completed searches
+    retain it, new games clear it, and a cancelled search loses it because the
+    worker is terminated and recreated. This gives a prompt, race-free hard stop
+    without pthreads, SharedArrayBuffer, or cross-origin-isolation deployment
+    requirements. Start-position depth 10 produced the same 1,287,275 nodes and
+    PV as native search, at roughly 93 percent of native throughput in the local
+    measurement.
+
+85. **Client pondering is fixed-depth speculation, not emulated UCI text.**
+    After an engine move, the worker searches the position after the second PV
+    move. An exact root, depth, and complete move-prefix match claims either its
+    running or completed result; a mismatch cancels it before foreground search.
+    A successful claim immediately begins the next speculation. The native
+    executable remains regular UCI, while the browser avoids parsing its own UCI
+    subprocess protocol.
+
+86. **Analysis is a persistent lever with serialized automatic restarts.** It
+    is enabled by default and searches every new move, loaded ZFS-FEN, history
+    position, and depth selection to exactly that depth. Turning it off cancels
+    search and leaves it paused. Restart requests are serialized by generation,
+    preventing a cancelled worker and its replacement from racing for the one
+    engine slot. Board input remains available during analysis because worker
+    cancellation is independent of the UI thread.
+
+87. **The spherical cylinder mark is one asset at every brand scale.** The
+    landing mark, header/home control, and favicon use the same circular SVG and
+    the original typographic double arrow. Board-edge seam arrows remain plain
+    coordinate cues rather than being confused with clickable brand controls.

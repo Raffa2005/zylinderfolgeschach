@@ -133,17 +133,16 @@ boundaries.
 ## Play in the browser
 
 The `viewer` directory contains a Chessground board backed by the exact C++
-rules core compiled to WebAssembly. A small localhost service connects that
-board to the native `zfs_engine`; search is not duplicated in JavaScript. The
-browser remains authoritative for legal input and adjudication, and it validates
-the engine's returned move before applying it.
+rules core compiled to WebAssembly. The complete C++ search, evaluation, game
+history, and transposition table are compiled into a second WebAssembly module
+owned by one Web Worker; search is not duplicated in JavaScript and does not
+contact the native engine. The browser validates every returned move with the
+independent rules module before applying it.
 
-Build the engine, install the pinned viewer dependencies once, and start the
-playing UI:
+Install the pinned viewer dependencies once and start the playing UI. The
+committed distribution already contains both WebAssembly payloads:
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
 cd viewer
 npm install
 npm run play
@@ -159,12 +158,11 @@ returning to the live position safely resumes play. Move lists use SAN derived
 by the C++ variant rules core, with UCI retained as a fallback rather than
 reimplemented in the page.
 
-After every engine move, the service uses the second move of the completed PV
-as the expected human reply and searches that resulting position with UCI
-ponder mode. A matching reply uses `ponderhit`; a different reply cancels the
-speculation before the ordinary search starts. Pondering uses the same one
-native search worker—there is never a foreground and background engine search
-at once—and it is cancelled when the game or page closes.
+After every engine move, the browser uses the second move of the completed PV
+as the expected human reply and searches that resulting position to the chosen
+depth. A matching reply claims the completed or ongoing result; a different
+reply terminates the speculative worker before the ordinary search starts.
+There is never a foreground and background engine search at once.
 
 Every played game is saved as it progresses in
 `.runtime/viewer/games.json`. Games presents a paged card list and exact replay;
@@ -173,24 +171,23 @@ Analysis is the separate technical workspace: it exposes ZFS-FEN loading,
 score, depth, nodes, and principal variation without making an engine move.
 Its score is always shown from White's perspective, and the first legal move of
 the current PV is drawn on the board. PV and history notation use the same
-rule-aware SAN conversion as Play.
+rule-aware SAN conversion as Play. Analysis is an on/off lever: while enabled,
+every move, loaded ZFS-FEN, navigation step, and depth change automatically
+starts a fresh search which stops at exactly the selected depth.
 Saved lines are replayed through the production WebAssembly rules core rather
 than trusted as diagrams.
 
-The server keeps one UCI process alive and allows only one search at a time.
-Each browser game gets a session identifier: `ucinewgame` clears the TT at the
-session boundary, while later moves in that game retain useful TT entries. The
-engine client restarts and replays a search once after an unexpected native
-process failure; cancellation is never retried, and a repeatedly failing engine
-is reported instead of looped forever. The engine still has exactly one
-CPU-intensive search worker; Node and the UCI controller only handle I/O and
-cancellation.
+The worker owns a 32 MiB TT, clears it between games, and retains it between
+moves. Normal completed searches reuse the worker. Because this build is
+deliberately non-threaded, cancellation terminates and recreates the worker;
+that is the hard interruption boundary which keeps the page responsive without
+SharedArrayBuffer, pthreads, or cross-origin-isolation headers. The local Node
+service now supplies only static files and the saved-game database to the pages.
 
 `npm run play` rebuilds the UI around the committed WebAssembly payload.
-`npm run dev` also recompiles that payload and therefore requires Emscripten
+`npm run dev` also recompiles both payloads and therefore requires Emscripten
 (`em++`). `npm run serve` serves an existing `viewer/dist` without rebuilding.
-Set `ZFS_ENGINE_PATH` to use an engine outside `build/zfs_engine`, and
-`ZFS_VIEWER_PORT` to change the default port 4173.
+`ZFS_VIEWER_PORT` changes the default port 4173.
 `ZFS_VIEWER_GAMES_PATH` changes the saved-game file. The service binds only to
 `127.0.0.1`.
 

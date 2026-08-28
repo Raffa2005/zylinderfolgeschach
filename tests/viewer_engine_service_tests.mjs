@@ -92,6 +92,12 @@ try {
   const playPage = await playResponse.text();
   assert.match(playPage, /<h1>New game<\/h1>/);
   assert.doesNotMatch(playPage, /engine-score|engine-pv|analysis-fen|ZFS-FEN/);
+  assert.doesNotMatch(playPage, /Online|Offline|Connecting/);
+
+  const workerResponse = await fetch(`${service.url}/engine-worker.js`);
+  assert.equal(workerResponse.status, 200);
+  assert.match(workerResponse.headers.get('content-type'), /^text\/javascript/);
+  assert.match(await workerResponse.text(), /zfs_engine_search/);
 
   const gamesResponse = await fetch(`${service.url}/games/`);
   assert.equal(gamesResponse.status, 200);
@@ -108,6 +114,8 @@ try {
   assert.match(analysisPage, /analysis-score/);
   assert.match(analysisPage, /analysis-pv/);
   assert.match(analysisPage, /analysis-fen/);
+  assert.match(analysisPage, /id="analysis-toggle" type="checkbox" checked/);
+  assert.doesNotMatch(analysisPage, /Online|Offline|Connecting/);
 
   const initialGame = {
     rootFen:

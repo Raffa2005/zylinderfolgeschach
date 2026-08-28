@@ -190,18 +190,11 @@ h1 {
 }
 
 .landing-mark {
+  width: 100%;
   aspect-ratio: 1;
-  border: 1px solid var(--line);
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(circle, rgba(215, 166, 74, .14), transparent 68%);
+  display: block;
   box-shadow: 0 25px 70px rgba(0, 0, 0, .32);
-}
-
-.landing-mark span {
-  color: var(--accent);
-  font: 700 clamp(64px, 12vw, 145px)/1 Georgia, serif;
 }
 
 .page-main { min-height: calc(100vh - 145px); padding-top: 48px; padding-bottom: 56px; }
@@ -241,9 +234,6 @@ h1 {
   text-transform: uppercase;
 }
 
-.connection { color: var(--muted); font-size: 12px; font-weight: 750; }
-.connection.online { color: var(--ok); }
-.connection.offline { color: var(--danger); }
 .count { color: var(--muted); font: 700 11px/1 ui-monospace, monospace; }
 .message { color: var(--muted); font-size: 13px; }
 .message.error, .error { color: var(--danger); }
@@ -282,6 +272,45 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 .choice input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
 .field { margin-top: 20px; }
 .full-button { width: 100%; margin-top: 22px; }
+
+.engine-switch {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+.engine-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch-track {
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--raised);
+  transition: border-color .15s ease, background .15s ease;
+}
+.switch-track span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: block;
+  background: var(--muted);
+  transition: transform .15s ease, background .15s ease;
+}
+.engine-switch input:checked + .switch-track {
+  border-color: var(--accent);
+  background: rgba(215, 166, 74, .2);
+}
+.engine-switch input:checked + .switch-track span {
+  background: var(--accent);
+  transform: translateX(18px);
+}
+.engine-switch input:focus-visible + .switch-track { outline: 3px solid var(--accent); outline-offset: 2px; }
+.engine-switch:has(input:disabled) { cursor: wait; opacity: .55; }
 
 .game-page { width: min(1250px, 100%); margin: 0 auto; padding: 14px 18px 30px; }
 

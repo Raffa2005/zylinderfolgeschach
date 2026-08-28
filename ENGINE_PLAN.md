@@ -115,35 +115,32 @@ explicit follow state. Options are `Hash`, `Move Overhead`, `Ponder`, and
 
 ## Browser play surface
 
-Chessground and the WebAssembly rules core own the displayed game. A
-localhost-only Node service maintains one native UCI process and streams its
-`info` and `bestmove` output to the page. Searches receive the canonical root
-ZFS-FEN plus the complete move prefix, preserving repetition history rather than
-reconstructing only the current diagram. A per-game token maps to
-`ucinewgame`: the TT is cleared between games and retained between moves of one
-game. Replacement requests send `stop` and wait for the old `bestmove` before
-starting, so there is never more than one CPU-intensive search.
-An unexpected native-engine exit causes one transparent process restart and
-replay of the interrupted search. User cancellation is not retried, and the
-second failure is surfaced instead of creating a crash loop.
+Chessground and the WebAssembly rules core own the displayed game. A dedicated
+Web Worker owns the same C++ Searcher, evaluation, Game history, and a 32 MiB
+TT compiled to WebAssembly. Searches receive the canonical root ZFS-FEN plus
+the complete move prefix, preserving repetition history rather than
+reconstructing only the current diagram. The TT is cleared between games and
+retained between completed searches in one game. Cancellation terminates and
+recreates the non-threaded worker; no native engine endpoint, pthread,
+SharedArrayBuffer, or cross-origin-isolation policy is required.
 
 The public surface uses a fixed dark/gold theme and a sparse landing page with
-focused Play, Games, and Analysis routes. Play defaults to the server engine at
+focused Play, Games, and Analysis routes. Play defaults to the client engine at
 depth 10 without clocks and excludes evaluation, PV, node counts, and arbitrary
 position loading. Those technical controls live in Analysis, whose search
 streams information without applying `bestmove`, displays scores from White's
-perspective, and draws the current legal PV move as a board arrow. Move history
+perspective, draws the current legal PV move as a board arrow, and automatically
+restarts to the selected fixed depth while its lever is enabled. Move history
 and PV notation are converted to SAN by the C++ rules bridge, with UCI as the
 failure fallback. Played games are appended to a
 bounded local store as their move prefix grows; Games pages through those
 records and replays each line through the WebAssembly rules core. Historical
 navigation is read-only and returning to the live cursor resumes the game.
-After an engine move, the service speculates on the second move of the final PV
-using the same UCI process in ponder mode. An exact game/root/depth/move-prefix
-match converts that work with `ponderhit`; a miss, game stop, navigation, page
-exit, or replacement request cancels it before any new search. A ponder hit
-starts the following ponder as well, so the lifecycle continues for the whole
-game while retaining the one-search-worker invariant.
+After an engine move, the browser speculates on the second move of the final PV
+using the same worker. An exact game/root/depth/move-prefix match claims that
+work; a miss, game stop, navigation, page exit, or replacement request
+terminates it before any new search. A hit starts the following speculation as
+well, retaining the one-search-worker invariant.
 
 ## Verification gates already present
 
@@ -154,8 +151,10 @@ game while retaining the one-search-worker invariant.
 - alpha-beta comparison with exhaustive shallow minimax;
 - material, leader/follower ordering, mate, root restriction, twofold,
   determinism, and limit tests;
-- browser bridge draw/navigation tests and execution of the shipped WASM;
-- a check that the distribution embeds that tested WASM payload;
+- browser bridge draw/navigation tests and execution of both shipped WASM
+  modules, including a forced-follow alpha-beta search;
+- checks that the distribution embeds both tested payloads and no longer
+  references a server engine endpoint;
 - a localhost service test covering validation, streamed analysis, a
   forced-follow `bestmove`, repeated ponder-hit chaining, replayed threefold
   history, and serialized cancellation/replacement, plus an actual mid-search
@@ -173,11 +172,9 @@ game while retaining the one-search-worker invariant.
    auxiliary-state indexing and proven cylinder symmetries.
 4. Add parallel search as a separate milestone, initially with per-worker
    positions and a C++ memory-model-safe shared TT.
-5. Compile the single-worker engine behind a dedicated Web Worker for a static
-   browser deployment. Keep rules and search in C++; use worker termination for
-   cancellation until browser threading is deliberately introduced. Choose
-   IndexedDB for a private browser archive or a small hosted database endpoint
-   for a shared archive rather than coupling storage to the engine port.
+5. Deploy the static engine surface to Cloudflare Pages. Choose IndexedDB for a
+   private browser archive or a small hosted database endpoint for a shared
+   archive rather than coupling storage to the completed engine port.
 
 Tablebases and parallelism must not complicate the current rules core or weaken
 single-worker reproducibility.
