@@ -10,9 +10,11 @@ const projectDirectory = path.resolve(viewerDirectory, '..');
 const root = path.join(viewerDirectory, 'dist');
 const enginePath = process.env.ZFS_ENGINE_PATH ??
   path.join(projectDirectory, 'build', 'zfs_engine');
+const gamesPath = process.env.ZFS_VIEWER_GAMES_PATH ??
+  path.join(projectDirectory, '.runtime', 'viewer', 'games.json');
 
 if (!Number.isInteger(port) || port < 0 || port > 65535) {
   throw new Error('ZFS_VIEWER_PORT must be an integer from 0 to 65535');
 }
 
-await startViewerServer({ root, enginePath, host, port });
+await startViewerServer({ root, enginePath, gamesPath, host, port });

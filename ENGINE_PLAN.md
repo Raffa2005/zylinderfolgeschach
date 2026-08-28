@@ -127,8 +127,14 @@ An unexpected native-engine exit causes one transparent process restart and
 replay of the interrupted search. User cancellation is not retried, and the
 second failure is surfaced instead of creating a crash loop.
 
-The public surface is split into a sparse landing page and focused Play, Games,
-and Rules routes. Play defaults to the server engine at depth 10 without clocks.
+The public surface uses a fixed dark/gold theme and a sparse landing page with
+focused Play, Games, and Analysis routes. Play defaults to the server engine at
+depth 10 without clocks and excludes evaluation, PV, node counts, and arbitrary
+position loading. Those technical controls live in Analysis, whose search
+streams information without applying `bestmove`. Played games are appended to a
+bounded local store as their move prefix grows; Games pages through those
+records and replays each line through the WebAssembly rules core. Historical
+navigation is read-only and returning to the live cursor resumes the game.
 After an engine move, the service speculates on the second move of the final PV
 using the same UCI process in ponder mode. An exact game/root/depth/move-prefix
 match converts that work with `ponderhit`; a miss, game stop, navigation, page
@@ -164,6 +170,11 @@ game while retaining the one-search-worker invariant.
    auxiliary-state indexing and proven cylinder symmetries.
 4. Add parallel search as a separate milestone, initially with per-worker
    positions and a C++ memory-model-safe shared TT.
+5. Compile the single-worker engine behind a dedicated Web Worker for a static
+   browser deployment. Keep rules and search in C++; use worker termination for
+   cancellation until browser threading is deliberately introduced. Choose
+   IndexedDB for a private browser archive or a small hosted database endpoint
+   for a shared archive rather than coupling storage to the engine port.
 
 Tablebases and parallelism must not complicate the current rules core or weaken
 single-worker reproducibility.

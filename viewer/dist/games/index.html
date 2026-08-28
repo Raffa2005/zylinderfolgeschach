@@ -3,82 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Replay complete, verified Kugelfisch self-play games." />
-    <meta name="theme-color" content="#f4f5f2" />
+    <meta name="description" content="Saved Kugelfisch games." />
+    <meta name="theme-color" content="#171614" />
     <title>Games · Kugelfisch</title>
-    <script>try{if(localStorage.getItem('zfs-theme')==='dark')document.documentElement.classList.add('dark')}catch(error){}</script>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body data-page="games">
-    <a class="skip-link" href="#main">Skip to games</a>
-    <header class="site-header">
-      <div class="site-shell header-inner">
-        <a class="brand" href="/" aria-label="Kugelfisch home"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a>
-        <nav class="site-nav" aria-label="Primary navigation">
-          <a href="/play">Play</a><a href="/games" aria-current="page">Games</a><a href="/rules">Rules</a>
-          <button class="icon-button ghost theme-button" type="button" aria-label="Use dark theme" title="Toggle color theme">◐</button>
-        </nav>
-      </div>
-    </header>
-
-    <main id="main" class="site-shell page-main archive-page">
-      <div class="page-heading">
-        <div>
-          <p class="eyebrow">Self-play archive</p>
-          <h1>Inspect complete games.</h1>
-          <p id="archive-summary">Loading the verified archive…</p>
-        </div>
-        <span id="archive-count" class="large-count">0 games</span>
-      </div>
-
-      <div class="archive-layout">
-        <div class="archive-board-column">
-          <div class="board-frame">
-            <span class="seam seam-left" aria-hidden="true">↔</span>
-            <div id="board" class="board" role="application" aria-label="Recorded Zylinderfolgeschach game"></div>
-            <span class="seam seam-right" aria-hidden="true">↔</span>
+    <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games" aria-current="page">Games</a><a href="/analysis">Analysis</a></nav></div></header>
+    <main class="site-shell page-main" id="main">
+      <section id="archive-view">
+        <div class="page-heading"><h1>Games</h1><a class="button primary" href="/play">New game</a></div>
+        <p id="archive-loading" class="message">Loading games…</p>
+        <div id="archive-grid" class="archive-grid" hidden></div>
+        <div id="archive-empty" class="empty-state" hidden><p>No saved games.</p><a class="button primary" href="/play">Play</a></div>
+        <p id="archive-error" class="message error" role="alert"></p>
+        <div id="archive-pager" class="pager" hidden><button id="load-more" type="button">Load more</button></div>
+      </section>
+      <section id="detail-view" hidden>
+        <div class="page-heading"><h1 id="detail-heading">Game</h1><div class="heading-actions"><a id="analyze-game" class="button primary" href="/analysis">Analyze</a><a class="button" href="/games">All games</a></div></div>
+        <p id="detail-loading" class="message">Loading game…</p>
+        <div id="detail-content" class="detail-layout" hidden>
+          <div class="panel replay-panel">
+            <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="replay-board" class="board" role="application" aria-label="Saved game replay"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
+            <div class="replay-controls wide"><button id="replay-start" type="button">⇤</button><button id="replay-back" type="button">←</button><span id="replay-counter">0 / 0</span><button id="replay-forward" type="button">→</button><button id="replay-end" type="button">⇥</button></div>
           </div>
-          <div class="archive-position" aria-live="polite">
-            <strong id="archive-status">Starting position</strong>
-            <span id="archive-follow">No follow field</span>
-          </div>
+          <aside class="side-stack">
+            <section class="panel"><strong id="detail-result" class="detail-result"></strong><div id="detail-players" class="detail-players"></div><div id="detail-meta" class="meta-list"></div></section>
+            <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="detail-ply-count" class="count"></span></div><div id="detail-moves" class="history"></div></section>
+          </aside>
         </div>
-
-        <aside class="archive-console">
-          <section class="panel archive-picker">
-            <div class="panel-heading"><h2>Recorded game</h2><span id="archive-index" class="count">1 / 64</span></div>
-            <label class="visually-hidden" for="archive-game">Recorded game</label>
-            <select id="archive-game"></select>
-            <div class="compact-actions three">
-              <button id="archive-previous" class="secondary" type="button">← Previous</button>
-              <button id="archive-restart" type="button">Restart</button>
-              <button id="archive-next" class="secondary" type="button">Next →</button>
-            </div>
-          </section>
-
-          <section id="archive-meta" class="panel archive-meta"></section>
-
-          <section class="panel move-section">
-            <div class="panel-heading"><h2>Moves</h2><span id="ply-count" class="count">0 / 0</span></div>
-            <div id="history" class="history empty">No moves yet</div>
-            <div class="replay-controls" aria-label="Move navigation">
-              <button id="start-position" class="icon-button secondary" type="button" aria-label="Go to start">⇤</button>
-              <button id="back" class="icon-button secondary" type="button" aria-label="Previous move">←</button>
-              <button id="forward" class="icon-button secondary" type="button" aria-label="Next move">→</button>
-              <button id="end-position" class="icon-button secondary" type="button" aria-label="Go to end">⇥</button>
-            </div>
-          </section>
-
-          <button id="flip" class="secondary" type="button">Flip board</button>
-          <p id="error" class="message error" role="alert"></p>
-        </aside>
-      </div>
+        <p id="detail-error" class="message error" role="alert"></p>
+      </section>
     </main>
-
-    <footer class="site-footer">
-      <div class="site-shell footer-inner"><span>Kugelfisch · Zylinderfolgeschach</span><div class="footer-links"><a href="/play">Play</a><a href="/rules">Rules</a></div></div>
-    </footer>
-    <script type="module" src="/site.js"></script>
+    <footer class="site-footer"><div class="site-shell footer-inner"><span>Saved locally</span><div><a href="/play">Play</a><a href="/analysis">Analysis</a></div></div></footer>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

@@ -552,16 +552,15 @@ and their consequences, not the code line by line.
     terminology keep `zfs` because renaming those stable interfaces would create
     migration work without changing the product identity.
 
-68. **Human review uses complete, machine-verified self-play games.** The viewer
-    ships all 64 games from the final champion-#3-versus-ZFS-0 checkpoint rather
-    than a curated set of attractive wins. The export strips deployment paths
-    and fingerprints but retains colors, result, termination, opening-line
-    identity, work totals, and the complete UCI move list. A generated-runtime
-    test replays every move through the production WebAssembly rules core and
-    verifies the final checkmate, threefold, or still-ongoing safety-cap state.
-    The browser loads the whole line and rewinds it, so existing arrow and move
-    navigation inspect exact historical follow state. A user move intentionally
-    branches from and leaves archive mode; the recorded game is never mutated.
+68. **Self-play exports are complete, machine-verified research artifacts.** The
+    64 games from the final champion-#3-versus-ZFS-0 checkpoint remain an
+    uncurated record rather than a selection of attractive wins. The export
+    strips deployment paths and fingerprints but retains colors, result,
+    termination, opening identity, work totals, and complete UCI moves. A
+    generated-runtime test replays every move through the production
+    WebAssembly rules core and verifies its final state. This experiment corpus
+    is no longer the website's Games collection; public game browsing is built
+    from games actually played through the site.
 
 ## Second autoresearch cycle
 
@@ -625,14 +624,14 @@ and their consequences, not the code line by line.
     viewer is an enabled user service with whole-service automatic restart, so
     it no longer depends on a Codex terminal session remaining attached.
 
-76. **The website separates explanation, play, and inspection.** The public
-    structure is a sparse landing page plus dedicated Play, Games, and Rules
-    routes with one shared header, theme control, and visual vocabulary. The
-    Bachelor project's hierarchy and interaction economy were used as a
-    read-only reference; no source, asset, runtime, or data was copied or
-    modified. Active play suppresses nonessential chrome, while setup exposes
-    only side and strength. ZFS-FEN remains available in a collapsed expert
-    panel, and the verified self-play archive keeps its own focused viewer.
+76. **The website separates play, saved games, and analysis—not explanation.**
+    The public structure is a sparse landing page plus Play, Games, and Analysis
+    routes with one fixed dark/gold visual vocabulary. There is no theme switch
+    or Rules page. The Bachelor project's hierarchy and interaction economy
+    were used as a read-only reference; no source, asset, runtime, or data was
+    copied or modified. Play exposes only side, strength, legal interaction,
+    turn/follow state, and move navigation. ZFS-FEN, score, nodes, depth, and PV
+    exist only in Analysis.
 
 77. **Browser play uses bounded, single-worker PV pondering.** Depth 10 remains
     the standard server option and there are no clocks. After each engine move,
@@ -644,3 +643,20 @@ and their consequences, not the code line by line.
     same serialized cancellation boundary. A hit immediately starts the next
     prediction, so pondering continues across turns without ever creating a
     second CPU-intensive search worker.
+
+78. **Played-game storage is a small append-forward database boundary.** Each
+    browser game receives an opaque ID and is persisted from its canonical root
+    ZFS-FEN, complete move prefix, final ZFS-FEN, players, depth, and result.
+    Updates may only extend the existing prefix; completed games are immutable,
+    apart from idempotent repeats. Writes are serialized and atomically renamed,
+    with a 5,000-record bound and no native Node dependency. The HTTP list/detail
+    interface is intentionally storage-agnostic so a hosted implementation can
+    replace the local JSON file without changing the pages.
+
+79. **Historical play navigation is read-only and resumable.** Entering history
+    cancels and drains search/ponder work but does not end the game. Input is
+    disabled before the live cursor, preventing an accidental branch that would
+    conflict with the append-only saved record. Returning to the last ply resumes
+    the human turn or starts a fresh engine search as appropriate. Stop and new
+    search requests are awaited at this boundary so a late stop cannot kill the
+    resumed search.

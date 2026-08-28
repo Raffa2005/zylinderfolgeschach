@@ -149,13 +149,13 @@ npm install
 npm run play
 ```
 
-Open the local URL printed by the command. The landing page links to focused
-Play, Games, and Rules sections. Play offers a server-engine game with side and
-depth selection; there are deliberately no clocks. Depth 10 is the standard
-default. Iterative depth, score, nodes, and principal variation are streamed
-while Kugelfisch thinks. Legal destinations and the follow field remain
-visible. Left/Right navigate the move line; navigation deliberately stops
-engine-play mode so an in-flight reply cannot land on a historical position.
+Open the local URL printed by the command. The dark, compact interface has
+focused Play, Games, and Analysis sections. Play offers only side and strength;
+there are no clocks and depth 10 is the default. Legal destinations, the follow
+field, and move history remain visible, while score, nodes, principal variation,
+and arbitrary-position loading are deliberately absent. Left/Right review the
+move line without allowing a historical position to fork the played game;
+returning to the live position safely resumes play.
 
 After every engine move, the service uses the second move of the completed PV
 as the expected human reply and searches that resulting position with UCI
@@ -164,21 +164,13 @@ speculation before the ordinary search starts. Pondering uses the same one
 native search worker—there is never a foreground and background engine search
 at once—and it is cancelled when the game or page closes.
 
-The Games section includes all 64 games from the final
-champion-#3-versus-ZFS-0 checkpoint: 56 checkmates, seven automatic
-threefolds, and one draw imposed by the match runner's 256-ply safety cap.
-Selecting a game replays every move through the WebAssembly rules core and
-rewinds to its start. Arrow keys and the move list then work normally.
-
-The committed archive is generated from a checksummed match log rather than
-maintained by hand. A new archive can be exported with:
-
-```sh
-python3 tools/export_selfplay_gallery.py run.jsonl \
-  viewer/src/selfplay-games.json \
-  --candidate-name 'Kugelfisch candidate' --baseline-name 'Kugelfisch baseline' \
-  --title 'Candidate vs baseline' --description 'Recorded paired checkpoint.'
-```
+Every played game is saved as it progresses in
+`.runtime/viewer/games.json`. Games presents a paged card list and exact replay;
+the detail view supports the move list, arrow keys, and an Analysis handoff.
+Analysis is the separate technical workspace: it exposes ZFS-FEN loading,
+score, depth, nodes, and principal variation without making an engine move.
+Saved lines are replayed through the production WebAssembly rules core rather
+than trusted as diagrams.
 
 The server keeps one UCI process alive and allows only one search at a time.
 Each browser game gets a session identifier: `ucinewgame` clears the TT at the
@@ -193,7 +185,8 @@ cancellation.
 `npm run dev` also recompiles that payload and therefore requires Emscripten
 (`em++`). `npm run serve` serves an existing `viewer/dist` without rebuilding.
 Set `ZFS_ENGINE_PATH` to use an engine outside `build/zfs_engine`, and
-`ZFS_VIEWER_PORT` to change the default port 4173. The service binds only to
+`ZFS_VIEWER_PORT` to change the default port 4173.
+`ZFS_VIEWER_GAMES_PATH` changes the saved-game file. The service binds only to
 `127.0.0.1`.
 
 ## License

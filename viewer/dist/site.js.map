@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": ["../src/site.js"],
-  "sourcesContent": ["const root = document.documentElement;\nconst buttons = document.querySelectorAll('.theme-button');\n\nfunction renderTheme() {\n  const dark = root.classList.contains('dark');\n  for (const button of buttons) {\n    button.textContent = dark ? '\u2600' : '\u25D0';\n    button.setAttribute('aria-label', dark ? 'Use light theme' : 'Use dark theme');\n  }\n  document.querySelector('meta[name=\"theme-color\"]')?.setAttribute(\n    'content',\n    dark ? '#181b1a' : '#f4f5f2',\n  );\n}\n\nfor (const button of buttons) {\n  button.addEventListener('click', () => {\n    const dark = root.classList.toggle('dark');\n    try {\n      localStorage.setItem('zfs-theme', dark ? 'dark' : 'light');\n    } catch {\n      // Theme persistence is optional; the toggle itself still works.\n    }\n    renderTheme();\n  });\n}\n\nrenderTheme();\n"],
-  "mappings": "AAAA,IAAMA,EAAO,SAAS,gBAChBC,EAAU,SAAS,iBAAiB,eAAe,EAEzD,SAASC,GAAc,CACrB,IAAMC,EAAOH,EAAK,UAAU,SAAS,MAAM,EAC3C,QAAWI,KAAUH,EACnBG,EAAO,YAAcD,EAAO,SAAM,SAClCC,EAAO,aAAa,aAAcD,EAAO,kBAAoB,gBAAgB,EAE/E,SAAS,cAAc,0BAA0B,GAAG,aAClD,UACAA,EAAO,UAAY,SACrB,CACF,CAEA,QAAWC,KAAUH,EACnBG,EAAO,iBAAiB,QAAS,IAAM,CACrC,IAAMD,EAAOH,EAAK,UAAU,OAAO,MAAM,EACzC,GAAI,CACF,aAAa,QAAQ,YAAaG,EAAO,OAAS,OAAO,CAC3D,MAAQ,CAER,CACAD,EAAY,CACd,CAAC,EAGHA,EAAY",
-  "names": ["root", "buttons", "renderTheme", "dark", "button"]
-}

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,9 +56,12 @@ try {
 }
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
+const temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'kugelfisch-viewer-'));
+const gamesPath = path.join(temporaryDirectory, 'games.json');
 const service = await startViewerServer({
   root: path.resolve(testsDirectory, '../viewer/dist'),
   enginePath,
+  gamesPath,
   host: '127.0.0.1',
   port: 0,
   quiet: true,
@@ -73,20 +78,94 @@ try {
   const pageResponse = await fetch(`${service.url}/`);
   assert.equal(pageResponse.status, 200);
   const page = await pageResponse.text();
-  assert.match(page, /The board wraps/);
-  assert.doesNotMatch(page, /Edge-case presets/);
+  assert.match(page, /<h1>Kugelfisch<\/h1>/);
+  assert.doesNotMatch(page, /Rules|theme-toggle|The board wraps/);
 
   const playResponse = await fetch(`${service.url}/play`);
   assert.equal(playResponse.status, 200);
-  assert.match(await playResponse.text(), /Play against Kugelfisch/);
+  const playPage = await playResponse.text();
+  assert.match(playPage, /<h1>New game<\/h1>/);
+  assert.doesNotMatch(playPage, /engine-score|engine-pv|analysis-fen|ZFS-FEN/);
 
   const gamesResponse = await fetch(`${service.url}/games/`);
   assert.equal(gamesResponse.status, 200);
-  assert.match(await gamesResponse.text(), /Self-play archive/);
+  const gamesPage = await gamesResponse.text();
+  assert.match(gamesPage, /No saved games/);
+  assert.doesNotMatch(gamesPage, /Self-play archive/);
 
   const rulesResponse = await fetch(`${service.url}/rules`);
-  assert.equal(rulesResponse.status, 200);
-  assert.match(await rulesResponse.text(), /Follow when it is legal/);
+  assert.equal(rulesResponse.status, 404);
+
+  const analysisResponse = await fetch(`${service.url}/analysis`);
+  assert.equal(analysisResponse.status, 200);
+  const analysisPage = await analysisResponse.text();
+  assert.match(analysisPage, /analysis-score/);
+  assert.match(analysisPage, /analysis-pv/);
+  assert.match(analysisPage, /analysis-fen/);
+
+  const initialGame = {
+    rootFen:
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -',
+    finalFen:
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -',
+    moves: [],
+    humanColor: 'white',
+    depth: 10,
+    turn: 'white',
+    terminal: 'ongoing',
+    createdAt: 1_700_000_000_000,
+  };
+  const createGameResponse = await fetch(`${service.url}/api/games/test-game`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(initialGame),
+  });
+  assert.equal(createGameResponse.status, 200);
+  const createdGame = (await createGameResponse.json()).game;
+  assert.equal(createdGame.id, 'test-game');
+  assert.equal(createdGame.status, 'active');
+  assert.equal(createdGame.result, '*');
+
+  const listGamesResponse = await fetch(`${service.url}/api/games?limit=1`);
+  assert.equal(listGamesResponse.status, 200);
+  const gamePage = await listGamesResponse.json();
+  assert.equal(gamePage.games.length, 1);
+  assert.equal(gamePage.games[0].id, 'test-game');
+  assert.equal(gamePage.games[0].plies, 0);
+  assert.equal(gamePage.nextCursor, null);
+
+  const advancedGame = {
+    ...initialGame,
+    finalFen:
+      'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1 e2',
+    moves: ['e2e4'],
+    turn: 'black',
+  };
+  const advanceGameResponse = await fetch(`${service.url}/api/games/test-game`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(advancedGame),
+  });
+  assert.equal(advanceGameResponse.status, 200);
+
+  const savedGameResponse = await fetch(`${service.url}/api/games/test-game`);
+  assert.equal(savedGameResponse.status, 200);
+  assert.deepEqual((await savedGameResponse.json()).game.moves, ['e2e4']);
+
+  const replayPageResponse = await fetch(`${service.url}/games/test-game`);
+  assert.equal(replayPageResponse.status, 200);
+  assert.match(await replayPageResponse.text(), /replay-board/);
+
+  const conflictResponse = await fetch(`${service.url}/api/games/test-game`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(initialGame),
+  });
+  assert.equal(conflictResponse.status, 409);
+
+  const persistedGames = JSON.parse(await readFile(gamesPath, 'utf8'));
+  assert.equal(persistedGames.schema, 1);
+  assert.equal(persistedGames.games[0].moves[0], 'e2e4');
 
   const invalidResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',
@@ -159,6 +238,28 @@ try {
   });
   assert.deepEqual(await stopResponse.json(), { stopped: true });
 
+  const analysisSearchResponse = await fetch(`${service.url}/api/engine/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      gameId: 'analysis-search',
+      rootFen: '7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3',
+      moves: [],
+      depth: 2,
+    }),
+  });
+  assert.equal(analysisSearchResponse.status, 200);
+  const analysisEvents = (await analysisSearchResponse.text())
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  assert.ok(analysisEvents.some((event) => event.type === 'info'));
+  assert.ok(!analysisEvents.some((event) => event.type === 'ponder'));
+  assert.deepEqual(analysisEvents.at(-1), {
+    type: 'bestmove',
+    move: 'a1a3',
+  });
+
   const repetitionResponse = await fetch(`${service.url}/api/engine/move`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -220,6 +321,7 @@ try {
   );
 } finally {
   await service.close();
+  await rm(temporaryDirectory, { recursive: true });
 }
 
 console.log('viewer engine service tests passed');

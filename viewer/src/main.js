@@ -3,7 +3,6 @@ import '@lichess-org/chessground/assets/chessground.base.css';
 import '@lichess-org/chessground/assets/chessground.brown.css';
 import '@lichess-org/chessground/assets/chessground.cburnett.css';
 import createZfsModule from './generated/zfs.js';
-import selfplayArchive from './selfplay-games.json';
 import './style.css';
 
 const module = await createZfsModule();
@@ -16,6 +15,8 @@ const api = {
   error: module.cwrap('zfs_last_error', 'string', []),
   state: module.cwrap('zfs_state_json', 'string', []),
 };
+
+const MOVE_PATTERN = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
 
 function readState() {
   return JSON.parse(api.state());
@@ -36,72 +37,59 @@ function destinations(moves) {
   return result;
 }
 
-function newGameId() {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+function newId(prefix = 'game') {
+  if (globalThis.crypto?.randomUUID) return `${prefix}-${crypto.randomUUID()}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function randomColor() {
   if (globalThis.crypto?.getRandomValues) {
     const value = new Uint8Array(1);
-    globalThis.crypto.getRandomValues(value);
+    crypto.getRandomValues(value);
     return value[0] & 1 ? 'white' : 'black';
   }
-  return Math.random() < 0.5 ? 'white' : 'black';
+  return Math.random() < .5 ? 'white' : 'black';
 }
 
 function sideName(color) {
   return color === 'white' ? 'White' : 'Black';
 }
 
-function terminalText(terminal, turn) {
+function terminalText(state) {
+  if (state.terminal === 'checkmate') return `${sideName(state.turn)} is checkmated`;
   const labels = {
-    'fifty-move': 'Draw by the 50-move rule',
+    'fifty-move': 'Draw by 50-move rule',
     stalemate: 'Stalemate',
-    threefold: 'Draw by threefold repetition',
+    threefold: 'Draw by repetition',
   };
-  if (terminal === 'checkmate') return `${sideName(turn)} is checkmated`;
-  return labels[terminal] ?? `${sideName(turn)} to move`;
+  return labels[state.terminal] ?? `${sideName(state.turn)} to move`;
 }
 
-function terminationText(termination) {
-  const labels = {
-    checkmate: 'Checkmate',
-    'fifty-move': '50-move draw',
-    'ply-cap': `${selfplayArchive.limit.maxPlies}-ply safety cap`,
-    stalemate: 'Stalemate',
-    threefold: 'Threefold repetition',
-  };
-  return labels[termination] ?? termination;
+function followText(state) {
+  if (state.followForced) return `Follow ${state.follow}`;
+  if (state.follow !== '-') return `No legal move reaches ${state.follow}`;
+  return 'No follow field';
 }
 
 function formatScore(score) {
   if (!score) return '—';
   if (score.kind === 'mate') {
-    return score.value < 0
-      ? `−M${Math.abs(score.value)}`
-      : `+M${score.value}`;
+    return score.value < 0 ? `−M${Math.abs(score.value)}` : `+M${score.value}`;
   }
-  const value = score.value / 100;
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+  const pawns = score.value / 100;
+  return `${pawns >= 0 ? '+' : ''}${pawns.toFixed(2)}`;
 }
 
-function followDetail(state) {
-  if (state.followForced) return `Follow ${state.follow} is compulsory`;
-  if (state.follow !== '-') return `No legal follower can reach ${state.follow}`;
-  return 'No active follow field';
+function readableDate(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }).format(new Date(value));
 }
 
 function shouldIgnoreArrowKey(event) {
-  if (
-    event.defaultPrevented ||
-    event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey
-  ) {
-    return true;
-  }
+  if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey ||
+      event.shiftKey) return true;
   const target = event.target;
   return target instanceof HTMLElement &&
     (target.isContentEditable || target.matches('input, textarea, select'));
@@ -113,12 +101,12 @@ function createBoard(element, state, afterMove) {
     orientation: 'white',
     turnColor: state.turn,
     coordinates: true,
-    animation: { enabled: true, duration: 170 },
+    animation: { enabled: true, duration: 160 },
     movable: {
       color: afterMove ? state.turn : undefined,
       free: false,
       dests: afterMove ? destinations(state.legalMoves) : new Map(),
-      showDests: true,
+      showDests: Boolean(afterMove),
       rookCastle: true,
       events: afterMove ? { after: afterMove } : {},
     },
@@ -130,205 +118,217 @@ function createBoard(element, state, afterMove) {
   });
 }
 
-async function initializePlay() {
-  const elements = {
-    back: document.querySelector('#back'),
-    board: document.querySelector('#board'),
-    bottomPlayer: document.querySelector('#bottom-player'),
-    bottomPlayerMeta: document.querySelector('#bottom-player-meta'),
-    bottomPlayerState: document.querySelector('#bottom-player-state'),
-    cancelPromotion: document.querySelector('#cancel-promotion'),
-    closeRules: document.querySelector('#close-rules'),
-    copyFen: document.querySelector('#copy-fen'),
-    depth: document.querySelector('#engine-depth'),
-    engineDepth: document.querySelector('#engine-depth-readout'),
-    engineNodes: document.querySelector('#engine-nodes'),
-    enginePv: document.querySelector('#engine-pv'),
-    engineScore: document.querySelector('#engine-score'),
-    engineState: document.querySelector('#engine-state'),
-    engineStatus: document.querySelector('#engine-status'),
-    error: document.querySelector('#error'),
-    fen: document.querySelector('#fen'),
-    flip: document.querySelector('#flip'),
-    forward: document.querySelector('#forward'),
-    gameView: document.querySelector('#game-view'),
-    history: document.querySelector('#history'),
-    livePosition: document.querySelector('#live-position'),
-    loadFen: document.querySelector('#load-fen'),
-    newGame: document.querySelector('#new-game'),
-    plyCount: document.querySelector('#ply-count'),
-    promotionChoices: document.querySelector('#promotion-choices'),
-    promotionDialog: document.querySelector('#promotion-dialog'),
-    rulesButton: document.querySelector('#rules-button'),
-    rulesDialog: document.querySelector('#rules-dialog'),
-    setupConnection: document.querySelector('#setup-connection'),
-    setupForm: document.querySelector('#setup-form'),
-    setupMessage: document.querySelector('#setup-message'),
-    setupView: document.querySelector('#setup-view'),
-    startGame: document.querySelector('#start-game'),
-    startPosition: document.querySelector('#start-position'),
-    status: document.querySelector('#status'),
-    statusDetail: document.querySelector('#status-detail'),
-    topPlayer: document.querySelector('#top-player'),
-    topPlayerMeta: document.querySelector('#top-player-meta'),
-    topPlayerState: document.querySelector('#top-player-state'),
-    turnDot: document.querySelector('#turn-dot'),
+function boardUpdate(state, movable, orientation) {
+  const lastMove = state.history[state.historyCursor - 1];
+  return {
+    fen: state.board,
+    orientation,
+    turnColor: state.turn,
+    check: state.inCheck ? state.turn : false,
+    lastMove: lastMove ? [lastMove.slice(0, 2), lastMove.slice(2, 4)] : [],
+    movable: {
+      color: movable ? state.turn : undefined,
+      dests: movable ? destinations(state.legalMoves) : new Map(),
+    },
+    drawable: {
+      autoShapes: state.follow === '-'
+        ? []
+        : [{ orig: state.follow, brush: 'yellow' }],
+    },
   };
+}
 
+function renderMoveHistory(container, state, onSelect) {
+  container.replaceChildren();
+  container.classList.toggle('empty', state.history.length === 0);
+  if (state.history.length === 0) {
+    container.textContent = 'No moves yet';
+    return;
+  }
+  let current;
+  state.history.forEach((move, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'history-move';
+    if (index >= state.historyCursor) button.classList.add('future');
+    if (index === state.historyCursor - 1) {
+      button.classList.add('current');
+      current = button;
+    }
+    button.textContent = `${index + 1}. ${move}`;
+    button.addEventListener('click', () => onSelect(index + 1));
+    container.append(button);
+  });
+  current?.scrollIntoView({ block: 'nearest' });
+}
+
+function navigateState(state, cursor) {
+  if (cursor < 0 || cursor > state.history.length) return false;
+  let accepted = true;
+  let current = state.historyCursor;
+  while (accepted && current > cursor) {
+    accepted = api.back();
+    if (accepted) --current;
+  }
+  while (accepted && current < cursor) {
+    accepted = api.forward();
+    if (accepted) ++current;
+  }
+  return accepted;
+}
+
+function choosePromotion(dialog, choices, cancel, candidates) {
+  const names = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
+  choices.replaceChildren();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (move) => {
+      if (settled) return;
+      settled = true;
+      resolve(move);
+    };
+    for (const suffix of ['q', 'r', 'b', 'n']) {
+      const move = candidates.find((candidate) => candidate.endsWith(suffix));
+      if (!move) continue;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = names[suffix];
+      button.addEventListener('click', () => {
+        dialog.close();
+        finish(move);
+      });
+      choices.append(button);
+    }
+    cancel.onclick = () => dialog.close();
+    dialog.addEventListener('close', () => finish(null), { once: true });
+    dialog.showModal();
+  });
+}
+
+async function readEngineEvents(response, onEvent) {
+  if (!response.body) throw new Error('engine response has no body');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let bestMove;
+  for (;;) {
+    const { done, value } = await reader.read();
+    pending += decoder.decode(value, { stream: !done });
+    let newline;
+    while ((newline = pending.indexOf('\n')) >= 0) {
+      consume(pending.slice(0, newline));
+      pending = pending.slice(newline + 1);
+    }
+    if (done) break;
+  }
+  consume(pending);
+  return bestMove;
+
+  function consume(line) {
+    if (!line.trim()) return;
+    const event = JSON.parse(line);
+    if (event.type === 'error') throw new Error(event.message || 'engine search failed');
+    if (event.type === 'bestmove') bestMove = event.move;
+    onEvent(event);
+  }
+}
+
+async function requestEngineStop(gameId, keepalive = false) {
+  if (!gameId) return;
+  await fetch('/api/engine/stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gameId }),
+    keepalive,
+  }).catch(() => {});
+}
+
+function postEngineStop(gameId) {
+  void requestEngineStop(gameId, true);
+}
+
+async function engineStatus() {
+  const response = await fetch('/api/engine/status', { cache: 'no-store' });
+  if (!response.ok) throw new Error(`engine service returned HTTP ${response.status}`);
+  return response.json();
+}
+
+async function initializePlay() {
+  const element = (id) => document.getElementById(id);
+  const elements = {
+    back: element('back'), board: element('board'), bottomMeta: element('bottom-player-meta'),
+    bottomName: element('bottom-player'), bottomState: element('bottom-player-state'),
+    cancelPromotion: element('cancel-promotion'), depth: element('engine-depth'),
+    engineStatus: element('engine-status'), error: element('error'), flip: element('flip'),
+    forward: element('forward'), gameView: element('game-view'), history: element('history'),
+    live: element('live-position'), newGame: element('new-game'), ply: element('ply-count'),
+    promotionChoices: element('promotion-choices'), promotionDialog: element('promotion-dialog'),
+    setupConnection: element('setup-connection'), setupForm: element('setup-form'),
+    setupMessage: element('setup-message'), setupView: element('setup-view'),
+    start: element('start-game'), startPosition: element('start-position'),
+    status: element('status'), statusDetail: element('status-detail'),
+    topMeta: element('top-player-meta'), topName: element('top-player'),
+    topState: element('top-player-state'), turnDot: element('turn-dot'),
+  };
   api.reset();
   let state = readState();
   let rootFen = state.fen;
   let ground;
-  let inputLocked = false;
   let orientation = 'white';
+  let inputLocked = false;
+  let saveChain = Promise.resolve();
   const engine = {
-    analysis: null,
-    available: false,
-    controller: null,
-    depth: 10,
-    enabled: false,
-    gameId: null,
-    humanColor: 'white',
-    message: 'Waiting for the engine service',
-    ponderMove: null,
-    requestSerial: 0,
-    thinking: false,
+    available: false, controller: null, createdAt: 0, depth: 10, enabled: false,
+    gameId: null, humanColor: 'white', message: 'Ready', pondering: false,
+    requestSerial: 0, stopPromise: Promise.resolve(), thinking: false,
   };
-
-  function setError(message = '') {
-    elements.error.textContent = message;
-  }
 
   function ensureBoard() {
     if (!ground) ground = createBoard(elements.board, state, onBoardMove);
     return ground;
   }
 
-  function canHumanMove() {
-    return !inputLocked &&
-      !engine.thinking &&
-      state.terminal === 'ongoing' &&
+  function canMove() {
+    return !inputLocked && !engine.thinking && state.terminal === 'ongoing' &&
+      state.historyCursor === state.history.length &&
       (!engine.enabled || state.turn === engine.humanColor);
   }
 
   function renderPlayers() {
-    const topColor = engine.humanColor === 'white' ? 'black' : 'white';
-    const bottomColor = engine.humanColor;
-    const setPlayer = (name, meta, status, color) => {
+    const topColor = orientation === 'white' ? 'black' : 'white';
+    const bottomColor = orientation;
+    const set = (name, meta, status, color) => {
       const human = color === engine.humanColor;
       name.textContent = human ? 'You' : 'Kugelfisch';
-      meta.textContent = human
-        ? sideName(color)
-        : `${sideName(color)} · depth ${engine.depth}`;
+      meta.textContent = sideName(color);
       if (state.terminal !== 'ongoing') status.textContent = 'Finished';
       else if (state.turn !== color) status.textContent = 'Waiting';
       else if (!human && engine.thinking) status.textContent = 'Thinking';
-      else if (human && engine.ponderMove) status.textContent = 'Pondering';
       else status.textContent = 'To move';
       status.classList.toggle('active', state.turn === color);
     };
-    setPlayer(
-      elements.topPlayer,
-      elements.topPlayerMeta,
-      elements.topPlayerState,
-      topColor,
-    );
-    setPlayer(
-      elements.bottomPlayer,
-      elements.bottomPlayerMeta,
-      elements.bottomPlayerState,
-      bottomColor,
-    );
-  }
-
-  function renderHistory() {
-    elements.plyCount.textContent =
-      `${state.historyCursor} / ${state.history.length}`;
-    elements.history.replaceChildren();
-    elements.history.classList.toggle('empty', state.history.length === 0);
-    if (state.history.length === 0) {
-      elements.history.textContent = 'No moves yet';
-    } else {
-      let currentMove;
-      state.history.forEach((move, index) => {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = 'history-move';
-        if (index >= state.historyCursor) item.classList.add('future');
-        if (index === state.historyCursor - 1) {
-          item.classList.add('current');
-          currentMove = item;
-        }
-        item.textContent = `${index + 1}. ${move}`;
-        item.addEventListener('click', () => navigateTo(index + 1));
-        elements.history.append(item);
-      });
-      currentMove?.scrollIntoView({ block: 'nearest' });
-    }
-    elements.startPosition.disabled = inputLocked || state.historyCursor === 0;
-    elements.back.disabled = inputLocked || state.historyCursor === 0;
-    elements.forward.disabled =
-      inputLocked || state.historyCursor === state.history.length;
-    elements.livePosition.disabled =
-      inputLocked || state.historyCursor === state.history.length;
-  }
-
-  function renderEngine() {
-    elements.engineState.textContent = engine.available ? 'Online' : 'Offline';
-    elements.engineState.className =
-      `connection ${engine.available ? 'online' : 'offline'}`;
-    elements.engineStatus.textContent = engine.message;
-    elements.engineScore.textContent = formatScore(engine.analysis?.score);
-    elements.engineDepth.textContent = engine.analysis?.depth === undefined
-      ? 'Depth —'
-      : `Depth ${engine.analysis.depth}`;
-    elements.engineNodes.textContent = engine.analysis?.nodes === undefined
-      ? '— nodes'
-      : `${engine.analysis.nodes.toLocaleString()} nodes`;
-    elements.enginePv.textContent = engine.analysis?.pv?.length
-      ? engine.analysis.pv.join(' ')
-      : 'No analysis yet';
+    set(elements.topName, elements.topMeta, elements.topState, topColor);
+    set(elements.bottomName, elements.bottomMeta, elements.bottomState, bottomColor);
   }
 
   function render() {
-    if (!elements.gameView.hidden) {
-      const board = ensureBoard();
-      const lastMove = state.history[state.historyCursor - 1];
-      const humanMayMove = canHumanMove();
-      board.set({
-        fen: state.board,
-        orientation,
-        turnColor: state.turn,
-        check: state.inCheck ? state.turn : false,
-        lastMove: lastMove ? [lastMove.slice(0, 2), lastMove.slice(2, 4)] : [],
-        movable: {
-          color: humanMayMove ? state.turn : undefined,
-          dests: humanMayMove ? destinations(state.legalMoves) : new Map(),
-        },
-        drawable: {
-          autoShapes: state.follow === '-'
-            ? []
-            : [{ orig: state.follow, brush: 'yellow' }],
-        },
-      });
-    }
-
-    elements.fen.value = state.fen;
+    if (!elements.gameView.hidden) ensureBoard().set(boardUpdate(state, canMove(), orientation));
+    const reviewing = state.historyCursor !== state.history.length;
+    elements.status.textContent = reviewing
+      ? `Move ${state.historyCursor} of ${state.history.length}`
+      : state.terminal === 'ongoing'
+        ? `${sideName(state.turn)} to move`
+        : terminalText(state);
+    elements.statusDetail.textContent = `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
     elements.turnDot.className = `turn-dot ${state.turn}`;
-    const side = sideName(state.turn);
-    if (state.terminal !== 'ongoing') {
-      elements.status.textContent = terminalText(state.terminal, state.turn);
-    } else if (engine.thinking) {
-      elements.status.textContent = `${side} to move · Kugelfisch is thinking`;
-    } else {
-      elements.status.textContent = `${side} to move`;
-    }
-    elements.statusDetail.textContent = state.inCheck
-      ? `Check · ${followDetail(state)}`
-      : followDetail(state);
+    elements.engineStatus.textContent = engine.message;
+    elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;
+    renderMoveHistory(elements.history, state, navigateTo);
+    elements.startPosition.disabled = inputLocked || state.historyCursor === 0;
+    elements.back.disabled = inputLocked || state.historyCursor === 0;
+    elements.forward.disabled = inputLocked || state.historyCursor === state.history.length;
+    elements.live.disabled = inputLocked || state.historyCursor === state.history.length;
     renderPlayers();
-    renderHistory();
-    renderEngine();
   }
 
   function sync() {
@@ -336,36 +336,30 @@ async function initializePlay() {
     render();
   }
 
-  async function connectEngine() {
-    try {
-      const response = await fetch('/api/engine/status', { cache: 'no-store' });
+  function snapshot() {
+    return {
+      rootFen, finalFen: state.fen,
+      moves: state.history.slice(0, state.historyCursor),
+      humanColor: engine.humanColor, depth: engine.depth,
+      turn: state.turn, terminal: state.terminal, createdAt: engine.createdAt,
+    };
+  }
+
+  function saveGame() {
+    if (!engine.gameId || !engine.createdAt) return;
+    const id = engine.gameId;
+    const body = JSON.stringify(snapshot());
+    saveChain = saveChain.then(async () => {
+      const response = await fetch(`/api/games/${encodeURIComponent(id)}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body,
+      });
       if (!response.ok) {
-        throw new Error(`engine service returned HTTP ${response.status}`);
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `could not save game (HTTP ${response.status})`);
       }
-      const status = await response.json();
-      engine.available = status.available === true;
-      if (Number.isInteger(status.defaultDepth)) {
-        engine.depth = status.defaultDepth;
-        const option = [...elements.depth.options].find(
-          (candidate) => Number(candidate.value) === status.defaultDepth,
-        );
-        if (option) elements.depth.value = option.value;
-      }
-      engine.message = engine.available
-        ? `Ready at depth ${engine.depth}`
-        : 'Native engine is unavailable';
-    } catch (error) {
-      engine.available = false;
-      engine.message = error instanceof Error ? error.message : String(error);
-    }
-    elements.startGame.disabled = !engine.available;
-    elements.setupConnection.textContent = engine.available ? 'Online' : 'Offline';
-    elements.setupConnection.className =
-      `connection ${engine.available ? 'online' : 'offline'}`;
-    elements.setupMessage.textContent = engine.available
-      ? 'The server engine is ready.'
-      : engine.message;
-    renderEngine();
+    }).catch((error) => {
+      elements.error.textContent = error instanceof Error ? error.message : String(error);
+    });
   }
 
   function cancelSearch() {
@@ -375,272 +369,171 @@ async function initializePlay() {
     engine.thinking = false;
   }
 
-  function notifyEngineStop(gameId) {
-    if (!gameId) return;
-    void fetch('/api/engine/stop', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameId }),
-      keepalive: true,
-    }).catch(() => {});
+  function stopGame(message) {
+    cancelSearch();
+    postEngineStop(engine.gameId);
+    engine.enabled = false;
+    engine.pondering = false;
+    engine.message = message;
   }
 
-  function stopEngineGame(message = 'Engine game stopped') {
-    const gameId = engine.gameId;
+  async function pauseSearch(message) {
     cancelSearch();
-    notifyEngineStop(gameId);
-    engine.enabled = false;
-    engine.ponderMove = null;
+    engine.pondering = false;
     engine.message = message;
-    render();
+    engine.stopPromise = requestEngineStop(engine.gameId);
+    await engine.stopPromise;
+  }
+
+  async function connect() {
+    try {
+      const status = await engineStatus();
+      engine.available = status.available === true;
+      if (Number.isInteger(status.defaultDepth)) {
+        const option = [...elements.depth.options].find((entry) =>
+          Number(entry.value) === status.defaultDepth,
+        );
+        if (option) elements.depth.value = option.value;
+      }
+    } catch (error) {
+      engine.available = false;
+      elements.setupMessage.textContent = error instanceof Error ? error.message : String(error);
+    }
+    elements.setupConnection.textContent = engine.available ? 'Online' : 'Offline';
+    elements.setupConnection.className = `connection ${engine.available ? 'online' : 'offline'}`;
+    elements.setupMessage.textContent = engine.available ? 'Engine ready.' : elements.setupMessage.textContent;
+    elements.start.disabled = !engine.available;
   }
 
   function beginGame(event) {
     event.preventDefault();
     if (!engine.available) return;
-    const requestedColor = new FormData(elements.setupForm).get('color');
-    const depth = Number(elements.depth.value);
-    if (!Number.isInteger(depth) || depth < 1 || depth > 100) {
-      elements.setupMessage.textContent = 'Choose a valid search depth.';
-      return;
-    }
-
+    const requested = new FormData(elements.setupForm).get('color');
     api.reset();
     state = readState();
     rootFen = state.fen;
-    engine.depth = depth;
-    engine.humanColor = requestedColor === 'random'
-      ? randomColor()
-      : requestedColor;
-    orientation = engine.humanColor;
-    engine.analysis = null;
+    engine.depth = Number(elements.depth.value);
+    engine.humanColor = requested === 'random' ? randomColor() : requested;
+    engine.gameId = newId();
+    engine.createdAt = Date.now();
     engine.enabled = true;
-    engine.gameId = newGameId();
-    engine.ponderMove = null;
-    engine.message = state.turn === engine.humanColor
-      ? 'Your move'
-      : `Thinking to depth ${engine.depth}`;
+    engine.pondering = false;
+    engine.message = state.turn === engine.humanColor ? 'Your move' : 'Thinking';
+    orientation = engine.humanColor;
+    elements.error.textContent = '';
     elements.setupView.hidden = true;
     elements.gameView.hidden = false;
     document.body.classList.add('active-game');
-    setError();
     render();
-    void maybeStartEngineMove();
+    saveGame();
+    void maybeEngineMove();
   }
 
   function returnToSetup() {
-    stopEngineGame('Ready for a new game');
+    stopGame('Ready');
     api.reset();
     state = readState();
     rootFen = state.fen;
-    engine.analysis = null;
     elements.gameView.hidden = true;
     elements.setupView.hidden = false;
     document.body.classList.remove('active-game');
-    elements.setupMessage.textContent = 'The server engine is ready.';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    elements.error.textContent = '';
   }
 
-  async function readEngineEvents(response, serial) {
-    if (!response.body) throw new Error('engine response has no body');
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let pending = '';
-    let bestMove;
-    let ponderMove;
-
-    const consume = (line) => {
-      if (line.trim() === '') return;
-      const event = JSON.parse(line);
-      if (event.type === 'error') {
-        throw new Error(event.message || 'engine search failed');
-      }
-      if (event.type === 'bestmove') bestMove = event.move;
-      if (event.type === 'ponder') ponderMove = event.move;
-      if (event.type === 'ponderhit' && serial === engine.requestSerial) {
-        engine.message = 'Ponder hit · finishing the reply';
-        renderEngine();
-      }
-      if (event.type === 'info' && serial === engine.requestSerial) {
-        engine.analysis = event;
-        engine.message = `Thinking to depth ${engine.depth}`;
-        renderEngine();
-      }
-    };
-
-    for (;;) {
-      const { done, value } = await reader.read();
-      pending += decoder.decode(value, { stream: !done });
-      let newline;
-      while ((newline = pending.indexOf('\n')) >= 0) {
-        consume(pending.slice(0, newline));
-        pending = pending.slice(newline + 1);
-      }
-      if (done) break;
-    }
-    consume(pending);
-    return { bestMove, ponderMove };
-  }
-
-  async function maybeStartEngineMove() {
-    if (
-      !engine.enabled ||
-      engine.thinking ||
-      state.terminal !== 'ongoing' ||
-      state.turn === engine.humanColor
-    ) {
+  async function maybeEngineMove() {
+    if (!engine.enabled || engine.thinking || state.turn === engine.humanColor ||
+        state.terminal !== 'ongoing') {
       if (engine.enabled && state.terminal !== 'ongoing') {
-        notifyEngineStop(engine.gameId);
+        postEngineStop(engine.gameId);
         engine.enabled = false;
-        engine.ponderMove = null;
         engine.message = 'Game over';
       } else if (engine.enabled && !engine.thinking) {
-        engine.message = engine.ponderMove
-          ? `Your move · pondering ${engine.ponderMove}`
-          : 'Your move';
+        engine.message = engine.pondering ? 'Pondering' : 'Your move';
       }
       render();
       return;
     }
-
     const controller = new AbortController();
-    const serial = ++engine.requestSerial;
+    const requestSerial = ++engine.requestSerial;
     engine.controller = controller;
     engine.thinking = true;
-    engine.ponderMove = null;
-    engine.analysis = null;
-    engine.message = `Thinking to depth ${engine.depth}`;
+    engine.pondering = false;
+    engine.message = 'Thinking';
     render();
-
     try {
       const response = await fetch('/api/engine/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          gameId: engine.gameId,
-          rootFen,
-          moves: state.history.slice(0, state.historyCursor),
-          depth: engine.depth,
+          gameId: engine.gameId, rootFen,
+          moves: state.history.slice(0, state.historyCursor), depth: engine.depth,
         }),
         signal: controller.signal,
       });
       if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(
-          body.error || `engine service returned HTTP ${response.status}`,
-        );
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `engine service returned HTTP ${response.status}`);
       }
-      const { bestMove, ponderMove } = await readEngineEvents(response, serial);
-      if (serial !== engine.requestSerial || !engine.enabled) return;
-      if (!bestMove || bestMove === '0000') {
-        throw new Error('engine returned no move for an ongoing position');
+      let pondering = false;
+      const bestMove = await readEngineEvents(response, (event) => {
+        if (event.type === 'ponder') pondering = true;
+      });
+      if (requestSerial !== engine.requestSerial || !engine.enabled) return;
+      if (!bestMove || bestMove === '0000' || !api.play(bestMove)) {
+        throw new Error(`engine returned an invalid move: ${bestMove ?? 'none'}`);
       }
-      if (!api.play(bestMove)) {
-        throw new Error(`engine returned illegal move ${bestMove}: ${api.error()}`);
-      }
-
       engine.controller = null;
       engine.thinking = false;
-      engine.ponderMove = ponderMove ?? null;
-      engine.message = engine.ponderMove
-        ? `Your move · pondering ${engine.ponderMove}`
-        : 'Your move';
-      setError();
+      engine.pondering = pondering;
+      engine.message = pondering ? 'Pondering' : 'Your move';
       sync();
-      void maybeStartEngineMove();
+      saveGame();
+      void maybeEngineMove();
     } catch (error) {
-      if (serial !== engine.requestSerial) return;
+      if (requestSerial !== engine.requestSerial) return;
       engine.controller = null;
       engine.thinking = false;
       if (error instanceof DOMException && error.name === 'AbortError') return;
       engine.enabled = false;
-      engine.ponderMove = null;
-      engine.message = error instanceof Error ? error.message : String(error);
-      setError(`Engine stopped: ${engine.message}`);
+      engine.message = 'Engine stopped';
+      elements.error.textContent = error instanceof Error ? error.message : String(error);
       render();
     }
   }
 
   async function onBoardMove(origin, destination) {
-    if (!canHumanMove()) {
-      sync();
-      return;
-    }
+    if (!canMove()) return sync();
     inputLocked = true;
-    const prefix = origin + destination;
-    const candidates = state.legalMoves.filter((move) => move.startsWith(prefix));
-    if (candidates.length === 0) {
-      inputLocked = false;
-      sync();
-      return;
-    }
+    const candidates = state.legalMoves.filter((move) => move.startsWith(origin + destination));
     let move = candidates[0];
-    if (candidates.length > 1) move = await choosePromotion(candidates);
+    if (candidates.length > 1) {
+      move = await choosePromotion(elements.promotionDialog, elements.promotionChoices,
+        elements.cancelPromotion, candidates);
+    }
     inputLocked = false;
-    if (move) commitMove(move);
-    else sync();
-  }
-
-  function commitMove(move) {
-    if (!canHumanMove()) return;
+    if (!move) return sync();
     if (!api.play(move)) {
-      setError(api.error());
-      sync();
-      return;
+      elements.error.textContent = api.error();
+      return sync();
     }
-    engine.ponderMove = null;
-    setError();
+    engine.pondering = false;
+    elements.error.textContent = '';
     sync();
-    void maybeStartEngineMove();
+    saveGame();
+    void maybeEngineMove();
   }
 
-  function choosePromotion(candidates) {
-    const names = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
-    elements.promotionChoices.replaceChildren();
-    return new Promise((resolve) => {
-      let settled = false;
-      const finish = (choice) => {
-        if (settled) return;
-        settled = true;
-        resolve(choice);
-      };
-      for (const suffix of ['q', 'r', 'b', 'n']) {
-        const move = candidates.find((candidate) => candidate.endsWith(suffix));
-        if (!move) continue;
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = names[suffix];
-        button.addEventListener('click', () => {
-          elements.promotionDialog.close();
-          finish(move);
-        });
-        elements.promotionChoices.append(button);
-      }
-      elements.promotionDialog.addEventListener('close', () => finish(null), {
-        once: true,
-      });
-      elements.promotionDialog.showModal();
-    });
-  }
-
-  function navigateTo(cursor) {
-    if (inputLocked || cursor < 0 || cursor > state.history.length) return;
-    if (engine.enabled) stopEngineGame('Engine stopped for move review');
+  async function navigateTo(cursor) {
+    if (inputLocked) return;
     inputLocked = true;
-    let accepted = true;
-    let current = state.historyCursor;
-    while (accepted && current > cursor) {
-      accepted = api.back();
-      if (accepted) --current;
-    }
-    while (accepted && current < cursor) {
-      accepted = api.forward();
-      if (accepted) ++current;
-    }
-    setError(accepted ? '' : api.error());
+    if (engine.enabled) await pauseSearch('Reviewing game');
+    const accepted = navigateState(state, cursor);
     state = readState();
     inputLocked = false;
+    elements.error.textContent = accepted ? '' : api.error();
     render();
+    if (accepted && engine.enabled && state.historyCursor === state.history.length) {
+      void maybeEngineMove();
+    }
   }
 
   elements.setupForm.addEventListener('submit', beginGame);
@@ -648,285 +541,435 @@ async function initializePlay() {
   elements.flip.addEventListener('click', () => {
     orientation = orientation === 'white' ? 'black' : 'white';
     ensureBoard().toggleOrientation();
+    renderPlayers();
   });
+  elements.startPosition.addEventListener('click', () => navigateTo(0));
   elements.back.addEventListener('click', () => navigateTo(state.historyCursor - 1));
   elements.forward.addEventListener('click', () => navigateTo(state.historyCursor + 1));
-  elements.startPosition.addEventListener('click', () => navigateTo(0));
-  elements.livePosition.addEventListener('click', () => navigateTo(state.history.length));
-  elements.rulesButton.addEventListener('click', () => elements.rulesDialog.showModal());
-  elements.closeRules.addEventListener('click', () => elements.rulesDialog.close());
-  elements.cancelPromotion.addEventListener('click', () => elements.promotionDialog.close());
+  elements.live.addEventListener('click', () => navigateTo(state.history.length));
+  document.addEventListener('keydown', (event) => {
+    if (shouldIgnoreArrowKey(event) || elements.promotionDialog.open) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      navigateTo(state.historyCursor + (event.key === 'ArrowLeft' ? -1 : 1));
+    }
+  });
+  window.addEventListener('pagehide', () => postEngineStop(engine.gameId));
+  await connect();
+}
 
-  elements.loadFen.addEventListener('click', () => {
-    const fen = elements.fen.value.trim();
-    const oldGameId = engine.gameId;
-    cancelSearch();
-    notifyEngineStop(oldGameId);
-    if (!api.load(fen)) {
-      setError(api.error());
-      elements.fen.value = fen;
+async function initializeGames() {
+  const element = (id) => document.getElementById(id);
+  const gameId = location.pathname.match(/^\/games\/([A-Za-z0-9._-]{1,128})\/?$/)?.[1];
+  const elements = {
+    analyze: element('analyze-game'), archiveEmpty: element('archive-empty'),
+    archiveError: element('archive-error'), archiveGrid: element('archive-grid'),
+    archiveLoading: element('archive-loading'), archivePager: element('archive-pager'),
+    archiveView: element('archive-view'), detailContent: element('detail-content'),
+    detailError: element('detail-error'), detailHeading: element('detail-heading'),
+    detailLoading: element('detail-loading'), detailMeta: element('detail-meta'),
+    detailMoves: element('detail-moves'), detailPlayers: element('detail-players'),
+    detailPly: element('detail-ply-count'), detailResult: element('detail-result'),
+    detailView: element('detail-view'), loadMore: element('load-more'),
+    replayBack: element('replay-back'), replayBoard: element('replay-board'),
+    replayCounter: element('replay-counter'), replayEnd: element('replay-end'),
+    replayForward: element('replay-forward'), replayStart: element('replay-start'),
+  };
+  let cursor = null;
+  let loading = false;
+  let state;
+  let ground;
+
+  function resultLabel(game) {
+    return game.status === 'completed' ? game.result : 'In progress';
+  }
+
+  function archiveCard(game) {
+    const link = document.createElement('a');
+    link.className = 'archive-card';
+    link.href = `/games/${encodeURIComponent(game.id)}`;
+    const result = document.createElement('strong');
+    result.textContent = resultLabel(game);
+    const date = document.createElement('span');
+    date.textContent = readableDate(game.updatedAt);
+    const head = document.createElement('div');
+    head.className = 'archive-card-head';
+    head.append(result, date);
+    const preview = document.createElement('div');
+    preview.className = 'archive-board board';
+    const details = document.createElement('div');
+    details.className = 'archive-card-details';
+    const white = document.createElement('span');
+    white.textContent = game.white;
+    const black = document.createElement('span');
+    black.textContent = game.black;
+    const meta = document.createElement('small');
+    meta.textContent = `${game.plies} plies · depth ${game.depth}`;
+    details.append(white, black, meta);
+    const body = document.createElement('div');
+    body.className = 'archive-card-body';
+    body.append(preview, details);
+    link.append(head, body);
+    createBoard(preview, {
+      board: game.finalFen.split(/\s+/)[0], turn: 'white', legalMoves: [],
+    });
+    return link;
+  }
+
+  async function loadPage(reset) {
+    if (loading) return;
+    loading = true;
+    if (reset) {
+      cursor = null;
+      elements.archiveGrid.replaceChildren();
+      elements.archiveLoading.hidden = false;
+      elements.archiveError.textContent = '';
+    }
+    try {
+      const params = new URLSearchParams({ limit: '20' });
+      if (cursor) params.set('cursor', cursor);
+      const response = await fetch(`/api/games?${params}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`could not load games (HTTP ${response.status})`);
+      const page = await response.json();
+      page.games.forEach((game) => elements.archiveGrid.append(archiveCard(game)));
+      cursor = page.nextCursor;
+      const empty = elements.archiveGrid.childElementCount === 0;
+      elements.archiveGrid.hidden = empty;
+      elements.archiveEmpty.hidden = !empty;
+      elements.archivePager.hidden = !cursor;
+    } catch (error) {
+      elements.archiveError.textContent = error instanceof Error ? error.message : String(error);
+    } finally {
+      elements.archiveLoading.hidden = true;
+      loading = false;
+    }
+  }
+
+  function renderReplay() {
+    ground.set(boardUpdate(state, false, 'white'));
+    elements.replayCounter.textContent = `${state.historyCursor} / ${state.history.length}`;
+    elements.detailPly.textContent = `${state.historyCursor} / ${state.history.length}`;
+    renderMoveHistory(elements.detailMoves, state, navigateReplay);
+    elements.replayStart.disabled = state.historyCursor === 0;
+    elements.replayBack.disabled = state.historyCursor === 0;
+    elements.replayForward.disabled = state.historyCursor === state.history.length;
+    elements.replayEnd.disabled = state.historyCursor === state.history.length;
+  }
+
+  function navigateReplay(cursorValue) {
+    if (!navigateState(state, cursorValue)) elements.detailError.textContent = api.error();
+    state = readState();
+    renderReplay();
+  }
+
+  async function loadDetail() {
+    try {
+      const response = await fetch(`/api/games/${encodeURIComponent(gameId)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`could not load game (HTTP ${response.status})`);
+      const { game } = await response.json();
+      if (!api.load(game.rootFen)) throw new Error(api.error());
+      for (const move of game.moves) {
+        if (!MOVE_PATTERN.test(move) || !api.play(move)) {
+          throw new Error(`saved game contains illegal move ${move}`);
+        }
+      }
+      state = readState();
+      ground = createBoard(elements.replayBoard, state);
+      elements.detailHeading.textContent = `${game.white} vs ${game.black}`;
+      elements.detailResult.textContent = resultLabel(game);
+      elements.detailPlayers.replaceChildren();
+      for (const [name, color] of [[game.white, 'White'], [game.black, 'Black']]) {
+        const row = document.createElement('span');
+        const side = document.createElement('small');
+        row.textContent = name;
+        side.textContent = color;
+        row.append(side);
+        elements.detailPlayers.append(row);
+      }
+      elements.detailMeta.textContent = `${game.moves.length} plies · depth ${game.depth} · ${readableDate(game.updatedAt)}`;
+      elements.analyze.href = `/analysis?game=${encodeURIComponent(game.id)}`;
+      elements.detailLoading.hidden = true;
+      elements.detailContent.hidden = false;
+      renderReplay();
+    } catch (error) {
+      elements.detailLoading.hidden = true;
+      elements.detailError.textContent = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  elements.loadMore.addEventListener('click', () => loadPage(false));
+  elements.replayStart.addEventListener('click', () => navigateReplay(0));
+  elements.replayBack.addEventListener('click', () => navigateReplay(state.historyCursor - 1));
+  elements.replayForward.addEventListener('click', () => navigateReplay(state.historyCursor + 1));
+  elements.replayEnd.addEventListener('click', () => navigateReplay(state.history.length));
+  document.addEventListener('keydown', (event) => {
+    if (!gameId || !state || shouldIgnoreArrowKey(event)) return;
+    const target = {
+      ArrowLeft: state.historyCursor - 1, ArrowRight: state.historyCursor + 1,
+      Home: 0, End: state.history.length,
+    }[event.key];
+    if (target === undefined) return;
+    event.preventDefault();
+    navigateReplay(target);
+  });
+  if (gameId) {
+    elements.archiveView.hidden = true;
+    elements.detailView.hidden = false;
+    await loadDetail();
+  } else {
+    elements.archiveView.hidden = false;
+    elements.detailView.hidden = true;
+    await loadPage(true);
+  }
+}
+
+async function initializeAnalysis() {
+  const element = (id) => document.getElementById(id);
+  const elements = {
+    back: element('analysis-back'), board: element('analysis-board'),
+    cancelPromotion: element('analysis-cancel-promotion'), connection: element('analysis-connection'),
+    copy: element('analysis-copy'), depth: element('analysis-depth'),
+    depthReadout: element('analysis-depth-readout'), end: element('analysis-end'),
+    engineState: element('analysis-engine-state'), engineStatus: element('analysis-engine-status'),
+    error: element('analysis-error'), fen: element('analysis-fen'), flip: element('analysis-flip'),
+    forward: element('analysis-forward'), history: element('analysis-history'),
+    load: element('analysis-load'), nodes: element('analysis-nodes'),
+    ply: element('analysis-ply-count'), promotionChoices: element('analysis-promotion-choices'),
+    promotionDialog: element('analysis-promotion-dialog'), pv: element('analysis-pv'),
+    reset: element('analysis-reset'), score: element('analysis-score'),
+    source: element('analysis-source'), start: element('analysis-start'),
+    status: element('analysis-status'), statusDetail: element('analysis-status-detail'),
+    toggle: element('analysis-toggle'), turnDot: element('analysis-turn-dot'),
+  };
+  api.reset();
+  let state = readState();
+  let rootFen = state.fen;
+  let orientation = 'white';
+  let inputLocked = false;
+  let available = false;
+  let controller;
+  let serial = 0;
+  let analysis;
+  let message = 'Ready';
+  let gameId = newId('analysis');
+  let stopPromise = Promise.resolve();
+  const ground = createBoard(elements.board, state, onBoardMove);
+
+  function canMove() {
+    return !inputLocked && !controller && state.terminal === 'ongoing';
+  }
+
+  function render() {
+    ground.set(boardUpdate(state, canMove(), orientation));
+    elements.status.textContent = state.terminal === 'ongoing'
+      ? `${sideName(state.turn)} to move`
+      : terminalText(state);
+    elements.statusDetail.textContent = `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
+    elements.turnDot.className = `turn-dot ${state.turn}`;
+    elements.fen.value = state.fen;
+    elements.engineStatus.textContent = message;
+    elements.score.textContent = formatScore(analysis?.score);
+    elements.depthReadout.textContent = analysis?.depth === undefined ? 'Depth —' : `Depth ${analysis.depth}`;
+    elements.nodes.textContent = analysis?.nodes === undefined ? '— nodes' : `${analysis.nodes.toLocaleString()} nodes`;
+    elements.pv.textContent = analysis?.pv?.length ? analysis.pv.join(' ') : 'No line.';
+    elements.toggle.textContent = controller ? 'Stop' : 'Analyze';
+    elements.toggle.disabled = !available || state.terminal !== 'ongoing';
+    elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;
+    renderMoveHistory(elements.history, state, navigateTo);
+    elements.start.disabled = inputLocked || state.historyCursor === 0;
+    elements.back.disabled = inputLocked || state.historyCursor === 0;
+    elements.forward.disabled = inputLocked || state.historyCursor === state.history.length;
+    elements.end.disabled = inputLocked || state.historyCursor === state.history.length;
+  }
+
+  function cancelAnalysis(nextMessage = 'Ready', keepalive = false) {
+    const wasRunning = Boolean(controller);
+    ++serial;
+    controller?.abort();
+    controller = undefined;
+    if (wasRunning) stopPromise = requestEngineStop(gameId, keepalive);
+    message = nextMessage;
+  }
+
+  function changedPosition() {
+    cancelAnalysis();
+    analysis = undefined;
+    state = readState();
+    render();
+  }
+
+  async function runAnalysis() {
+    if (controller) {
+      cancelAnalysis('Stopped');
+      render();
       return;
+    }
+    await stopPromise;
+    if (controller) return;
+    const searchController = new AbortController();
+    const requestSerial = ++serial;
+    controller = searchController;
+    analysis = undefined;
+    message = 'Analyzing';
+    render();
+    try {
+      const response = await fetch('/api/engine/analyze', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gameId, rootFen, moves: state.history.slice(0, state.historyCursor),
+          depth: Number(elements.depth.value),
+        }),
+        signal: searchController.signal,
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || `engine service returned HTTP ${response.status}`);
+      }
+      await readEngineEvents(response, (event) => {
+        if (event.type === 'info' && requestSerial === serial) {
+          analysis = event;
+          render();
+        }
+      });
+      if (requestSerial !== serial) return;
+      controller = undefined;
+      message = 'Complete';
+      render();
+    } catch (error) {
+      if (requestSerial !== serial) return;
+      controller = undefined;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      message = 'Stopped';
+      elements.error.textContent = error instanceof Error ? error.message : String(error);
+      render();
+    }
+  }
+
+  async function onBoardMove(origin, destination) {
+    if (!canMove()) return render();
+    inputLocked = true;
+    const candidates = state.legalMoves.filter((move) => move.startsWith(origin + destination));
+    let move = candidates[0];
+    if (candidates.length > 1) {
+      move = await choosePromotion(elements.promotionDialog, elements.promotionChoices,
+        elements.cancelPromotion, candidates);
+    }
+    inputLocked = false;
+    if (!move) return render();
+    if (!api.play(move)) elements.error.textContent = api.error();
+    else elements.error.textContent = '';
+    changedPosition();
+  }
+
+  function navigateTo(cursorValue) {
+    if (inputLocked) return;
+    cancelAnalysis();
+    inputLocked = true;
+    const accepted = navigateState(state, cursorValue);
+    state = readState();
+    inputLocked = false;
+    analysis = undefined;
+    elements.error.textContent = accepted ? '' : api.error();
+    render();
+  }
+
+  function loadRoot(fen) {
+    cancelAnalysis();
+    if (!api.load(fen)) {
+      elements.error.textContent = api.error();
+      elements.fen.value = fen;
+      return false;
     }
     state = readState();
     rootFen = state.fen;
-    engine.analysis = null;
-    engine.enabled = true;
-    engine.gameId = newGameId();
-    engine.ponderMove = null;
-    engine.message = state.turn === engine.humanColor
-      ? 'Your move'
-      : `Thinking to depth ${engine.depth}`;
-    setError();
+    gameId = newId('analysis');
+    analysis = undefined;
+    elements.error.textContent = '';
     render();
-    void maybeStartEngineMove();
-  });
+    return true;
+  }
 
-  elements.copyFen.addEventListener('click', async () => {
+  async function loadSavedGame(id) {
+    const response = await fetch(`/api/games/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`could not load saved game (HTTP ${response.status})`);
+    const { game } = await response.json();
+    if (!loadRoot(game.rootFen)) return;
+    for (const move of game.moves) {
+      if (!MOVE_PATTERN.test(move) || !api.play(move)) {
+        throw new Error(`saved game contains illegal move ${move}`);
+      }
+    }
+    state = readState();
+    elements.source.hidden = false;
+    elements.source.replaceChildren();
+    elements.source.append('Loaded ');
+    const link = document.createElement('a');
+    link.href = `/games/${encodeURIComponent(game.id)}`;
+    link.textContent = `${game.white} vs ${game.black}`;
+    elements.source.append(link, '.');
+    render();
+  }
+
+  elements.toggle.addEventListener('click', runAnalysis);
+  elements.flip.addEventListener('click', () => {
+    orientation = orientation === 'white' ? 'black' : 'white';
+    ground.toggleOrientation();
+  });
+  elements.reset.addEventListener('click', () => {
+    api.reset();
+    state = readState();
+    rootFen = state.fen;
+    gameId = newId('analysis');
+    elements.source.hidden = true;
+    changedPosition();
+  });
+  elements.load.addEventListener('click', () => loadRoot(elements.fen.value.trim()));
+  elements.copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(elements.fen.value);
-      elements.copyFen.textContent = 'Copied';
-      window.setTimeout(() => {
-        elements.copyFen.textContent = 'Copy';
-      }, 1000);
+      elements.copy.textContent = 'Copied';
+      setTimeout(() => { elements.copy.textContent = 'Copy'; }, 1000);
     } catch {
       elements.fen.select();
     }
   });
-
-  document.addEventListener('keydown', (event) => {
-    if (shouldIgnoreArrowKey(event) || elements.promotionDialog.open) return;
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      navigateTo(state.historyCursor - 1);
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      navigateTo(state.historyCursor + 1);
-    }
-  });
-
-  window.addEventListener('pagehide', () => {
-    if (!engine.gameId) return;
-    const body = new Blob([JSON.stringify({ gameId: engine.gameId })], {
-      type: 'application/json',
-    });
-    navigator.sendBeacon?.('/api/engine/stop', body);
-  });
-
-  await connectEngine();
-}
-
-function initializeGames() {
-  const elements = {
-    archiveCount: document.querySelector('#archive-count'),
-    archiveFollow: document.querySelector('#archive-follow'),
-    archiveGame: document.querySelector('#archive-game'),
-    archiveIndex: document.querySelector('#archive-index'),
-    archiveMeta: document.querySelector('#archive-meta'),
-    archiveNext: document.querySelector('#archive-next'),
-    archivePrevious: document.querySelector('#archive-previous'),
-    archiveRestart: document.querySelector('#archive-restart'),
-    archiveStatus: document.querySelector('#archive-status'),
-    archiveSummary: document.querySelector('#archive-summary'),
-    back: document.querySelector('#back'),
-    board: document.querySelector('#board'),
-    endPosition: document.querySelector('#end-position'),
-    error: document.querySelector('#error'),
-    flip: document.querySelector('#flip'),
-    forward: document.querySelector('#forward'),
-    history: document.querySelector('#history'),
-    plyCount: document.querySelector('#ply-count'),
-    startPosition: document.querySelector('#start-position'),
-  };
-
-  if (selfplayArchive.schema !== 1 || !selfplayArchive.games.length) {
-    throw new Error('the bundled self-play archive is invalid');
-  }
-  api.reset();
-  let state = readState();
-  let activeGame = selfplayArchive.games[0];
-  let inputLocked = false;
-  const ground = createBoard(elements.board, state);
-
-  function selectedIndex() {
-    const index = selfplayArchive.games.findIndex(
-      (game) => game.id === elements.archiveGame.value,
-    );
-    return index < 0 ? 0 : index;
-  }
-
-  function renderMeta() {
-    const game = activeGame;
-    const heading = document.createElement('div');
-    heading.className = 'archive-result';
-    heading.textContent = `${game.result} · ${terminationText(game.termination)}`;
-    const players = document.createElement('p');
-    players.textContent = `White: ${game.white} · Black: ${game.black}`;
-    const details = document.createElement('p');
-    details.textContent =
-      `Pair ${game.pair}, game ${game.game}, opening ${game.openingLine} · ` +
-      `${game.plies} plies · champion ${game.candidateOutcome}`;
-    const work = document.createElement('p');
-    work.textContent =
-      `Recorded nodes — champion ${game.candidateNodes.toLocaleString()}, ` +
-      `ZFS-0 ${game.baselineNodes.toLocaleString()}`;
-    elements.archiveMeta.replaceChildren(heading, players, details, work);
-  }
-
-  function renderHistory() {
-    elements.plyCount.textContent =
-      `${state.historyCursor} / ${state.history.length}`;
-    elements.history.replaceChildren();
-    elements.history.classList.toggle('empty', state.history.length === 0);
-    let currentMove;
-    state.history.forEach((move, index) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.className = 'history-move';
-      if (index >= state.historyCursor) item.classList.add('future');
-      if (index === state.historyCursor - 1) {
-        item.classList.add('current');
-        currentMove = item;
-      }
-      item.textContent = `${index + 1}. ${move}`;
-      item.addEventListener('click', () => navigateTo(index + 1));
-      elements.history.append(item);
-    });
-    currentMove?.scrollIntoView({ block: 'nearest' });
-  }
-
-  function render() {
-    const lastMove = state.history[state.historyCursor - 1];
-    ground.set({
-      fen: state.board,
-      turnColor: state.turn,
-      check: state.inCheck ? state.turn : false,
-      lastMove: lastMove ? [lastMove.slice(0, 2), lastMove.slice(2, 4)] : [],
-      movable: { color: undefined, dests: new Map() },
-      drawable: {
-        autoShapes: state.follow === '-'
-          ? []
-          : [{ orig: state.follow, brush: 'yellow' }],
-      },
-    });
-    elements.archiveStatus.textContent = state.terminal === 'ongoing'
-      ? `${sideName(state.turn)} to move`
-      : terminalText(state.terminal, state.turn);
-    elements.archiveFollow.textContent = state.inCheck
-      ? `Check · ${followDetail(state)}`
-      : followDetail(state);
-    const index = selectedIndex();
-    elements.archiveIndex.textContent =
-      `${index + 1} / ${selfplayArchive.games.length}`;
-    elements.archivePrevious.disabled = index === 0 || inputLocked;
-    elements.archiveNext.disabled =
-      index === selfplayArchive.games.length - 1 || inputLocked;
-    elements.startPosition.disabled = inputLocked || state.historyCursor === 0;
-    elements.back.disabled = inputLocked || state.historyCursor === 0;
-    elements.forward.disabled =
-      inputLocked || state.historyCursor === state.history.length;
-    elements.endPosition.disabled =
-      inputLocked || state.historyCursor === state.history.length;
-    renderHistory();
-    renderMeta();
-  }
-
-  function loadGame(game) {
-    if (inputLocked) return;
-    inputLocked = true;
-    api.reset();
-    let failure = '';
-    for (const move of game.moves) {
-      if (!api.play(move)) {
-        failure = `Archive move ${move} was rejected: ${api.error()}`;
-        break;
-      }
-    }
-    const completed = readState();
-    if (!failure && completed.history.length !== game.plies) {
-      failure = 'Archive replay produced the wrong history length.';
-    }
-    for (let cursor = completed.historyCursor; !failure && cursor > 0; --cursor) {
-      if (!api.back()) failure = `Could not rewind archive: ${api.error()}`;
-    }
-    if (failure) {
-      api.reset();
-      elements.error.textContent = failure;
-    } else {
-      elements.error.textContent = '';
-      activeGame = game;
-      elements.archiveGame.value = game.id;
-    }
-    state = readState();
-    inputLocked = false;
-    render();
-  }
-
-  function navigateTo(cursor) {
-    if (inputLocked || cursor < 0 || cursor > state.history.length) return;
-    inputLocked = true;
-    let accepted = true;
-    let current = state.historyCursor;
-    while (accepted && current > cursor) {
-      accepted = api.back();
-      if (accepted) --current;
-    }
-    while (accepted && current < cursor) {
-      accepted = api.forward();
-      if (accepted) ++current;
-    }
-    elements.error.textContent = accepted ? '' : api.error();
-    state = readState();
-    inputLocked = false;
-    render();
-  }
-
-  selfplayArchive.games.forEach((game, index) => {
-    const option = document.createElement('option');
-    option.value = game.id;
-    option.textContent =
-      `${String(index + 1).padStart(2, '0')} · ${game.result} · ` +
-      `${terminationText(game.termination)} · ${game.plies} plies`;
-    elements.archiveGame.append(option);
-  });
-  const summary = selfplayArchive.summary;
-  elements.archiveCount.textContent = `${summary.games} games`;
-  elements.archiveSummary.textContent =
-    `${selfplayArchive.description} Every move is replayed through the ` +
-    'production rules core before it is shown.';
-
-  elements.archiveGame.addEventListener('change', () => {
-    loadGame(selfplayArchive.games[selectedIndex()]);
-  });
-  elements.archiveRestart.addEventListener('click', () => loadGame(activeGame));
-  elements.archivePrevious.addEventListener('click', () => {
-    loadGame(selfplayArchive.games[Math.max(0, selectedIndex() - 1)]);
-  });
-  elements.archiveNext.addEventListener('click', () => {
-    loadGame(selfplayArchive.games[
-      Math.min(selfplayArchive.games.length - 1, selectedIndex() + 1)
-    ]);
-  });
-  elements.startPosition.addEventListener('click', () => navigateTo(0));
+  elements.start.addEventListener('click', () => navigateTo(0));
   elements.back.addEventListener('click', () => navigateTo(state.historyCursor - 1));
   elements.forward.addEventListener('click', () => navigateTo(state.historyCursor + 1));
-  elements.endPosition.addEventListener('click', () => navigateTo(state.history.length));
-  elements.flip.addEventListener('click', () => ground.toggleOrientation());
+  elements.end.addEventListener('click', () => navigateTo(state.history.length));
   document.addEventListener('keydown', (event) => {
-    if (shouldIgnoreArrowKey(event)) return;
-    if (event.key === 'ArrowLeft') {
+    if (shouldIgnoreArrowKey(event) || elements.promotionDialog.open) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       event.preventDefault();
-      navigateTo(state.historyCursor - 1);
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      navigateTo(state.historyCursor + 1);
+      navigateTo(state.historyCursor + (event.key === 'ArrowLeft' ? -1 : 1));
     }
   });
-
-  loadGame(activeGame);
+  window.addEventListener('pagehide', () => cancelAnalysis('Ready', true));
+  try {
+    const status = await engineStatus();
+    available = status.available === true;
+    elements.connection.textContent = available ? 'Online' : 'Offline';
+    elements.engineState.textContent = available ? 'Online' : 'Offline';
+    elements.connection.className = `connection ${available ? 'online' : 'offline'}`;
+    elements.engineState.className = `connection ${available ? 'online' : 'offline'}`;
+  } catch (error) {
+    elements.error.textContent = error instanceof Error ? error.message : String(error);
+  }
+  render();
+  const savedGame = new URLSearchParams(location.search).get('game');
+  if (savedGame) {
+    try {
+      await loadSavedGame(savedGame);
+    } catch (error) {
+      elements.error.textContent = error instanceof Error ? error.message : String(error);
+    }
+  }
 }
 
 if (document.body.dataset.page === 'play') {
   await initializePlay();
 } else if (document.body.dataset.page === 'games') {
-  initializeGames();
+  await initializeGames();
+} else if (document.body.dataset.page === 'analysis') {
+  await initializeAnalysis();
 }

@@ -3,121 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Play Zylinderfolgeschach against Kugelfisch, a purpose-built CPU chess engine." />
-    <meta name="theme-color" content="#f4f5f2" />
-    <title>Kugelfisch · Zylinderfolgeschach</title>
-    <script>try{if(localStorage.getItem('zfs-theme')==='dark')document.documentElement.classList.add('dark')}catch(error){}</script>
+    <meta name="description" content="Kugelfisch, a Zylinderfolgeschach engine." />
+    <meta name="theme-color" content="#171614" />
+    <title>Kugelfisch</title>
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body data-page="landing">
-    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="site-shell header-inner">
-        <a class="brand" href="/" aria-label="Kugelfisch home">
-          <span class="brand-mark" aria-hidden="true">↔</span>
-          Kugelfisch
-        </a>
+        <a class="brand" href="/" aria-label="Kugelfisch home"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a>
         <nav class="site-nav" aria-label="Primary navigation">
-          <a href="/play">Play</a>
-          <a href="/games">Games</a>
-          <a href="/rules">Rules</a>
-          <button class="icon-button ghost theme-button" type="button" aria-label="Use dark theme" title="Toggle color theme">◐</button>
+          <a href="/play">Play</a><a href="/games">Games</a><a href="/analysis">Analysis</a>
         </nav>
       </div>
     </header>
-
-    <main id="main">
-      <section class="site-shell hero" aria-labelledby="hero-title">
-        <div class="hero-copy">
-          <p class="eyebrow">Zylinderfolgeschach</p>
-          <h1 id="hero-title">The board wraps. Every move leaves a trail.</h1>
-          <p>
-            Chess on a cylinder, with one obligation: when a legal move can
-            enter the previous piece's origin, you must follow it.
-          </p>
-          <div class="hero-actions">
-            <a class="button" href="/play">Play Kugelfisch <span aria-hidden="true">→</span></a>
-            <a class="button secondary" href="/games">Browse games</a>
-            <a class="button secondary" href="/rules">Learn the rules</a>
-          </div>
-        </div>
-
-        <div class="rule-stack" aria-label="How Zylinderfolgeschach works">
-          <article class="rule-card">
-            <span class="rule-number">01</span>
-            <strong>Wrap the files</strong>
-            <p>Lines continue across the a- and h-file seam.</p>
-          </article>
-          <article class="rule-card active">
-            <span class="rule-number">02</span>
-            <strong>Follow the origin</strong>
-            <p>If a legal move can reach the square just vacated, it is compulsory.</p>
-          </article>
-          <article class="rule-card">
-            <span class="rule-number">03</span>
-            <strong>Checkmate still wins</strong>
-            <p>King safety, castling, promotion, and en passant remain.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="content-section" aria-labelledby="rules-title">
-        <div class="site-shell">
-          <div class="section-heading">
-            <p class="eyebrow">Two changes</p>
-            <h2 id="rules-title">A different game emerges.</h2>
-            <p>
-              Familiar pieces acquire unfamiliar incentives. Leading is
-              powerful, following is costly, and a conventional check can hand
-              the opponent new freedom.
-            </p>
-          </div>
-          <div class="feature-grid">
-            <article class="feature">
-              <span class="feature-index">01 / 03</span>
-              <h3>No side walls</h3>
-              <p>Bishops, rooks, queens, kings, knights, pawns, and en passant all respect the cylindrical seam.</p>
-            </article>
-            <article class="feature">
-              <span class="feature-index">02 / 03</span>
-              <h3>Forced pursuit</h3>
-              <p>The previous origin becomes the follow field. If at least one legal follower exists, every other move is forbidden.</p>
-            </article>
-            <article class="feature">
-              <span class="feature-index">03 / 03</span>
-              <h3>Purpose-built search</h3>
-              <p>Kugelfisch is a handcrafted, single-worker C++ engine measured by deterministic benchmarks and paired self-play.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="content-section" aria-labelledby="challenge-title">
-        <div class="site-shell">
-          <div class="section-heading">
-            <p class="eyebrow">The challenge</p>
-            <h2 id="challenge-title">Play, then inspect the line.</h2>
-            <p>Depth 10 is the standard game. The engine uses one CPU worker and ponders while you choose your reply.</p>
-          </div>
-          <div class="hero-actions">
-            <a class="button" href="/play">Start a game</a>
-            <a class="button secondary" href="/games">Review self-play</a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <div class="site-shell footer-inner">
-        <span>Kugelfisch · Zylinderfolgeschach</span>
-        <div class="footer-links">
-          <a href="/play">Play</a>
-          <a href="/games">Games</a>
-          <a href="/rules">Rules</a>
-          <a href="https://github.com/Raffa2005/zylinderfolgeschach">Source</a>
+    <main class="site-shell landing" id="main">
+      <div>
+        <p class="eyebrow">Zylinderfolgeschach</p>
+        <h1>Kugelfisch</h1>
+        <div class="hero-actions">
+          <a class="button primary" href="/play">Play</a>
+          <a class="button" href="/games">Games</a>
+          <a class="button" href="/analysis">Analysis</a>
         </div>
       </div>
+      <div class="landing-mark" aria-hidden="true"><span>↔</span></div>
+    </main>
+    <footer class="site-footer">
+      <div class="site-shell footer-inner"><span>Kugelfisch</span><a href="https://github.com/Raffa2005/zylinderfolgeschach">Source</a></div>
     </footer>
-    <script type="module" src="/site.js"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 
 import { UciEngineClient } from './engine-client.mjs';
+import { GameStore } from './game-store.mjs';
 
 export const DEFAULT_ENGINE_DEPTH = 10;
 
@@ -86,6 +87,75 @@ function validateSearch(body) {
   return { depth, gameId: body.gameId, rootFen: body.rootFen.trim(), moves };
 }
 
+function boundedFen(value, name) {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 256 ||
+    /[\r\n]/.test(value)
+  ) {
+    throw new HttpError(400, `${name} must be one bounded FEN line`);
+  }
+  const normalized = value.trim();
+  const fields = normalized.split(/\s+/).length;
+  if (fields !== 6 && fields !== 7) {
+    throw new HttpError(400, `${name} must contain six or seven fields`);
+  }
+  return normalized;
+}
+
+function validateStoredGame(id, body) {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    throw new HttpError(400, 'saved game must be an object');
+  }
+  const humanColor = body.humanColor;
+  if (humanColor !== 'white' && humanColor !== 'black') {
+    throw new HttpError(400, 'humanColor must be white or black');
+  }
+  if (!Number.isInteger(body.depth) || body.depth < 1 || body.depth > 100) {
+    throw new HttpError(400, 'depth must be an integer from 1 to 100');
+  }
+  if (!Number.isSafeInteger(body.createdAt) || body.createdAt < 0) {
+    throw new HttpError(400, 'createdAt must be a non-negative timestamp');
+  }
+  if (!Array.isArray(body.moves) || body.moves.length > 4096) {
+    throw new HttpError(400, 'moves must be a bounded array');
+  }
+  const moves = body.moves.map((move) => {
+    if (typeof move !== 'string' || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
+      throw new HttpError(400, 'moves must contain canonical UCI moves');
+    }
+    return move;
+  });
+  const terminal = body.terminal;
+  if (!['ongoing', 'checkmate', 'stalemate', 'threefold', 'fifty-move'].includes(terminal)) {
+    throw new HttpError(400, 'terminal has an unsupported value');
+  }
+  if (body.turn !== 'white' && body.turn !== 'black') {
+    throw new HttpError(400, 'turn must be white or black');
+  }
+  const completed = terminal !== 'ongoing';
+  const result = terminal === 'checkmate'
+    ? body.turn === 'white' ? '0-1' : '1-0'
+    : completed ? '1/2-1/2' : '*';
+  return {
+    id,
+    rootFen: boundedFen(body.rootFen, 'rootFen'),
+    finalFen: boundedFen(body.finalFen, 'finalFen'),
+    moves,
+    humanColor,
+    depth: body.depth,
+    turn: body.turn,
+    status: completed ? 'completed' : 'active',
+    result,
+    termination: terminal,
+    white: humanColor === 'white' ? 'You' : 'Kugelfisch',
+    black: humanColor === 'black' ? 'You' : 'Kugelfisch',
+    createdAt: body.createdAt,
+    updatedAt: Date.now(),
+  };
+}
+
 async function executableExists(enginePath) {
   try {
     await access(enginePath, fsConstants.X_OK);
@@ -98,12 +168,17 @@ async function executableExists(enginePath) {
 export async function startViewerServer({
   root,
   enginePath,
+  gamesPath,
   host = '127.0.0.1',
   port = 4173,
   quiet = false,
 }) {
   const staticRoot = path.resolve(root);
   const resolvedEngine = path.resolve(enginePath);
+  const resolvedGames = path.resolve(
+    gamesPath ?? path.join(staticRoot, '../../.runtime/viewer/games.json'),
+  );
+  const gameStore = await GameStore.open(resolvedGames);
   const engineAvailable = await executableExists(resolvedEngine);
   const engine = engineAvailable ? new UciEngineClient(resolvedEngine) : null;
   let activeSearch;
@@ -220,13 +295,76 @@ export async function startViewerServer({
         return;
       }
 
-      if (url.pathname === '/api/engine/move') {
+      if (url.pathname === '/api/games') {
+        if (request.method !== 'GET') throw new HttpError(405, 'method not allowed');
+        for (const name of url.searchParams.keys()) {
+          if (name !== 'limit' && name !== 'cursor') {
+            throw new HttpError(400, 'unsupported game-list parameter');
+          }
+        }
+        const rawLimit = url.searchParams.get('limit') ?? '20';
+        const rawCursor = url.searchParams.get('cursor');
+        if (!/^\d+$/.test(rawLimit)) {
+          throw new HttpError(400, 'game-list limit is invalid');
+        }
+        const limit = Number(rawLimit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+          throw new HttpError(400, 'game-list limit must be from 1 to 100');
+        }
+        let cursor;
+        if (rawCursor !== null) {
+          if (!/^\d+$/.test(rawCursor)) {
+            throw new HttpError(400, 'game-list cursor is invalid');
+          }
+          cursor = Number(rawCursor);
+          if (!Number.isSafeInteger(cursor)) {
+            throw new HttpError(400, 'game-list cursor is invalid');
+          }
+        }
+        writeJson(response, 200, gameStore.list(limit, cursor));
+        return;
+      }
+
+      const gameRoute = url.pathname.match(/^\/api\/games\/([A-Za-z0-9._-]{1,128})$/);
+      if (gameRoute) {
+        const id = gameRoute[1];
+        if (request.method === 'GET') {
+          const game = gameStore.get(id);
+          if (!game) throw new HttpError(404, 'saved game does not exist');
+          writeJson(response, 200, { game });
+          return;
+        }
+        if (request.method !== 'PUT') throw new HttpError(405, 'method not allowed');
+        if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
+          throw new HttpError(415, 'content type must be application/json');
+        }
+        const game = validateStoredGame(id, await readJson(request));
+        try {
+          const saved = await gameStore.put(game);
+          writeJson(response, 200, { game: saved });
+          return;
+        } catch (error) {
+          if (error?.code === 'GAME_CONFLICT') {
+            throw new HttpError(409, error.message);
+          }
+          if (error?.code === 'GAME_LIMIT') {
+            throw new HttpError(507, error.message);
+          }
+          throw error;
+        }
+      }
+
+      if (
+        url.pathname === '/api/engine/move' ||
+        url.pathname === '/api/engine/analyze'
+      ) {
         if (request.method !== 'POST') throw new HttpError(405, 'method not allowed');
         if (!engineAvailable) throw new HttpError(503, 'zfs_engine is not available');
         if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] ?? '')) {
           throw new HttpError(415, 'content type must be application/json');
         }
         const search = validateSearch(await readJson(request));
+        const allowPonder = url.pathname === '/api/engine/move';
 
         const currentSearch = await replaceSearch(
           'superseded by a new engine request',
@@ -251,7 +389,9 @@ export async function startViewerServer({
           });
 
           try {
-            const claimedPonder = await claimPonder(search);
+            const claimedPonder = allowPonder
+              ? await claimPonder(search)
+              : (await stopPonder('analysis search started'), undefined);
             let result;
             let latestInfo;
             if (claimedPonder) {
@@ -288,11 +428,9 @@ export async function startViewerServer({
                 },
               });
             }
-            const predictedMove = beginPonder(
-              search,
-              result.move,
-              latestInfo,
-            );
+            const predictedMove = allowPonder
+              ? beginPonder(search, result.move, latestInfo)
+              : undefined;
             if (predictedMove) {
               sendEvent({ type: 'ponder', move: predictedMove });
             }
@@ -343,7 +481,10 @@ export async function startViewerServer({
         throw new HttpError(405, 'method not allowed');
       }
       const pathname = decodeURIComponent(url.pathname);
-      const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
+      let relative = pathname === '/' ? 'index.html' : pathname.slice(1);
+      if (/^games\/[A-Za-z0-9._-]{1,128}\/?$/.test(relative)) {
+        relative = 'games/index.html';
+      }
       let filename = path.resolve(staticRoot, relative);
       if (filename !== staticRoot && !filename.startsWith(staticRoot + path.sep)) {
         throw new HttpError(403, 'forbidden');

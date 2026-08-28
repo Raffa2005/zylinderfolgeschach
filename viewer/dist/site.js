@@ -1,2 +1,0 @@
-var o=document.documentElement,n=document.querySelectorAll(".theme-button");function c(){let t=o.classList.contains("dark");for(let e of n)e.textContent=t?"\u2600":"\u25D0",e.setAttribute("aria-label",t?"Use light theme":"Use dark theme");document.querySelector('meta[name="theme-color"]')?.setAttribute("content",t?"#181b1a":"#f4f5f2")}for(let t of n)t.addEventListener("click",()=>{let e=o.classList.toggle("dark");try{localStorage.setItem("zfs-theme",e?"dark":"light")}catch{}c()});c();
-//# sourceMappingURL=site.js.map

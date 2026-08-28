@@ -112,7 +112,9 @@ requireCondition(distribution.includes('threefold'),
                  'distribution lacks threefold rendering');
 requireCondition(distribution.includes('fifty-move'),
                  'distribution lacks fifty-move rendering');
-requireCondition(distribution.includes('Champion #3 vs ZFS-0'),
-                 'distribution lacks the self-play archive');
+requireCondition(distribution.includes('/api/games'),
+                 'distribution lacks saved-game support');
+requireCondition(distribution.includes('/api/engine/analyze'),
+                 'distribution lacks the analysis endpoint');
 
 console.log('generated viewer runtime passed');

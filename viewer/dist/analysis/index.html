@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Analyze Zylinderfolgeschach positions with Kugelfisch." />
+    <meta name="theme-color" content="#171614" />
+    <title>Analysis · Kugelfisch</title>
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body data-page="analysis">
+    <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games">Games</a><a href="/analysis" aria-current="page">Analysis</a></nav></div></header>
+    <main class="site-shell page-main" id="main">
+      <div class="page-heading"><h1>Analysis</h1><span id="analysis-connection" class="connection">Connecting…</span></div>
+      <p id="analysis-source" class="message" hidden></p>
+      <div class="analysis-layout">
+        <div>
+          <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="analysis-board" class="board" role="application" aria-label="Analysis board"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
+          <div class="board-actions"><button id="analysis-flip" type="button">Flip board</button><button id="analysis-reset" type="button">Reset</button></div>
+        </div>
+        <aside class="analysis-console">
+          <section class="panel position-card"><div class="status-line"><span id="analysis-turn-dot" class="turn-dot"></span><div><strong id="analysis-status">Loading…</strong><span id="analysis-status-detail"></span></div></div></section>
+          <section class="panel engine-panel">
+            <div class="panel-heading"><h2>Kugelfisch</h2><span id="analysis-engine-state" class="connection">Offline</span></div>
+            <div class="analysis-controls"><select id="analysis-depth" aria-label="Analysis depth"><option value="8">Depth 8</option><option value="10" selected>Depth 10</option><option value="12">Depth 12</option><option value="14">Depth 14</option></select><button id="analysis-toggle" class="primary" type="button" disabled>Analyze</button></div>
+            <strong id="analysis-engine-status">Ready</strong>
+            <div class="engine-metrics"><span id="analysis-score">—</span><span id="analysis-depth-readout">Depth —</span><span id="analysis-nodes">— nodes</span></div>
+            <p id="analysis-pv" class="engine-pv">No line.</p>
+          </section>
+          <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="analysis-ply-count" class="count">0 / 0</span></div><div id="analysis-history" class="history empty">No moves yet</div><div class="replay-controls"><button id="analysis-start" type="button">⇤</button><button id="analysis-back" type="button">←</button><button id="analysis-forward" type="button">→</button><button id="analysis-end" type="button">⇥</button></div></section>
+          <section class="panel"><div class="field"><label for="analysis-fen">ZFS-FEN</label><textarea id="analysis-fen" rows="3" spellcheck="false"></textarea></div><div class="compact-actions"><button id="analysis-load" class="primary" type="button">Load</button><button id="analysis-copy" type="button">Copy</button></div></section>
+          <p id="analysis-error" class="message error" role="alert"></p>
+        </aside>
+      </div>
+    </main>
+    <footer class="site-footer"><div class="site-shell footer-inner"><span>Kugelfisch</span><div><a href="/play">Play</a><a href="/games">Games</a></div></div></footer>
+    <dialog id="analysis-promotion-dialog"><div class="dialog-body"><h2>Promotion</h2><div id="analysis-promotion-choices" class="promotion-grid"></div><button id="analysis-cancel-promotion" type="button">Cancel</button></div></dialog>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 /build*/
+/.runtime/
 /viewer/dist/
 /viewer/node_modules/
 /viewer/src/generated/*.js
