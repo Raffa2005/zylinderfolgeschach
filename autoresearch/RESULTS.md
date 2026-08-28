@@ -17,6 +17,10 @@ The JSONL ledger is authoritative.
 | bishop 360 | deferred | 4,199,466 | 1,115 ms | 96 |
 | bishop 390 | rejected | — | — | 32 |
 | `qsearch-tt-r1` | rejected | 3,274,584 | 945 ms | 128 |
+| `follow-countermove-r1` | rejected | 4,125,427 | 1,083 ms | 128 |
+| unique-follow choice depth | rejected | 105,670,494 | 24,756 ms | 0 |
+| depth-1 quiet futility r1 | rejected | 4,154,772 | 1,114 ms | 0 |
+| `depth1-quiet-upper-r2` | rejected | 3,912,489 | 1,099 ms | 64 |
 
 ## `null-verified-r2`: rejected
 
@@ -149,3 +153,53 @@ An exact-bound-only salvage saved just 550 of 4,201,814 nodes (0.013%) and was
 slower, so it was rejected before self-play. Both implementations were removed;
 the useful qsearch optimization remains exact tactical move generation without
 TT storage.
+
+## Follow countermove ordering: rejected
+
+A compact 64-by-64 reply table remembered a quiet cutoff move by the preceding
+move's origin and destination. It was disabled in synthetic-null subtrees and
+ranked below both killers. The two independent screens scored 50.00% and
+48.44% (-10.86 Elo point in the confirmation). Its 1.82% node reduction and
+roughly 3.5% time reduction did not justify the negative aggregate signal or
+the additional 16 KiB table, so the implementation was removed.
+
+## Unique-follow choice depth: rejected at the benchmark gate
+
+Treating a unique compulsory follow as consuming no search depth is attractive
+in principle and was made deterministic from position state, preserving TT
+depth meaning. In practice, forced-follow chains are common enough that the
+depth-9 corpus exploded from 4,201,814 to 105,670,494 nodes (25.15 times) and
+from about 1.11 seconds to 24.76 seconds. No self-play resources were spent on
+an unusable unbudgeted extension. A path budget would require its own TT state
+domain and was not smuggled in as an arbitrary follow-up.
+
+## Depth-1 quiet futility: rejected
+
+The conservative first schedule applied only from the seventh move at a
+depth-one null-window node, required a one-pawn material margin, and excluded
+pawns, kings, castling, TT moves, killers, checks, compulsory follows,
+terminal positions, repetitions, and rule-50 draws. It reduced nodes by only
+1.12% with no useful time gain and therefore failed its benchmark gate without
+self-play.
+
+A broader second form used a defensible horizon upper bound. After a
+material-preserving quiet move, an ordinary child may stand pat in qsearch, so
+the parent branch cannot exceed its material score; taking the maximum with
+zero also covers immediate draws. Exact check and legal-follow guards retained
+that property, and only TT upper bounds could contain the shortcut value. It
+reduced nodes by 6.89% and median time by 2.01%, but scored 47.66% (-16.30 Elo
+point) over 32 pairs, below the predeclared rejection line. Adversarial review
+also found that unconditional shallow check/follow work consumed most of the
+nominal node saving and that the focused tests were too weak to justify any
+wider schedule. Both forms were removed.
+
+## Champion #3 final checkpoint
+
+The frozen champion was finally measured directly against ZFS-0 over 32 pairs
+at 30 ms. It scored 51.56%, or +10.86 Elo point with a wide 95% interval of
+[-15.35, +37.20]; the sequential result remained inconclusive. The deterministic
+capacity result is much stronger: depth-9 nodes fell from 11,425,195 to
+4,201,814 (-63.22%), while interleaved median time fell from 3,416 ms to
+1,114 ms (-67.39%). The accepted engine core remains guarded null move,
+conservative LMR, exact tactical qsearch generation, and conventional material
+evaluation—nothing from the rejected experiments remains in the source.
