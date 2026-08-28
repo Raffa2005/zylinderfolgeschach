@@ -66,5 +66,6 @@ champion artifact while `--baseline-build` continues to provide the immutable
 ZFS-0 referee. Direct champion-versus-ZFS-0 checks report cumulative gain.
 
 `screen-v2` contains 256 independently generated, color-swapped training lines.
+`screen-v2-confirm` is a separately seeded 128-line training-validation pool.
 The original 32-line `screen-v1` remains frozen for reproducing early results;
 `holdout-v1` remains excluded from routine tuning.
