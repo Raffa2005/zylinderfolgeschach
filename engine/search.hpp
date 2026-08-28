@@ -30,6 +30,7 @@ struct SearchLimits {
     bool infinite = false;
     bool ponder = false;
     bool null_move_pruning = true;
+    bool late_move_reductions = true;
     bool restrict_search_moves = false;
     std::vector<Move> search_moves;
 };
@@ -55,6 +56,8 @@ struct SearchResult {
     std::uint64_t null_searches = 0;
     std::uint64_t null_verifications = 0;
     std::uint64_t null_cutoffs = 0;
+    std::uint64_t lmr_searches = 0;
+    std::uint64_t lmr_researches = 0;
     std::vector<Move> principal_variation;
 };
 

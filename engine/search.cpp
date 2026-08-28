@@ -663,6 +663,12 @@ private:
             }
         }
 
+        const bool reduce_late_moves =
+            limits_.late_move_reductions && null_window && depth >= 5 &&
+            moves.size() >= 8 &&
+            !position_.in_check(position_.side_to_move()) &&
+            !(valid_square(position_.follow_square()) &&
+              moves[0].to() == position_.follow_square());
         score_moves(moves, moves.size(), tt_move, ply);
         int best = -kInfinity;
         Move best_move{};
@@ -676,8 +682,25 @@ private:
                 score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1, true,
                                     synthetic_path);
             } else {
-                score = -alpha_beta(depth - 1, -alpha - 1, -alpha, ply + 1,
-                                    true, synthetic_path);
+                const bool reducible =
+                    reduce_late_moves && index >= 6 && is_quiet(move) &&
+                    !move.is_castle() && move != tt_move &&
+                    move != buffers_->killers[ply][0] &&
+                    move != buffers_->killers[ply][1] &&
+                    !position_.in_check(position_.side_to_move()) &&
+                    !position_.must_follow();
+                if (reducible) {
+                    ++lmr_searches_;
+                    score = -alpha_beta(depth - 2, -alpha - 1, -alpha, ply + 1,
+                                        true, synthetic_path);
+                }
+                if (!reducible || (!aborted_ && score > alpha)) {
+                    if (reducible) {
+                        ++lmr_researches_;
+                    }
+                    score = -alpha_beta(depth - 1, -alpha - 1, -alpha, ply + 1,
+                                        true, synthetic_path);
+                }
                 if (!aborted_ && score > alpha && score < beta) {
                     score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1,
                                         true, synthetic_path);
@@ -775,6 +798,8 @@ private:
         result_.null_searches = null_searches_;
         result_.null_verifications = null_verifications_;
         result_.null_cutoffs = null_cutoffs_;
+        result_.lmr_searches = lmr_searches_;
+        result_.lmr_researches = lmr_researches_;
         result_.selective_depth = std::max(result_.selective_depth,
                                             selective_depth_);
     }
@@ -798,6 +823,8 @@ private:
     std::uint64_t null_searches_ = 0;
     std::uint64_t null_verifications_ = 0;
     std::uint64_t null_cutoffs_ = 0;
+    std::uint64_t lmr_searches_ = 0;
+    std::uint64_t lmr_researches_ = 0;
     int selective_depth_ = 0;
     bool has_deadline_ = false;
     bool has_time_budget_ = false;

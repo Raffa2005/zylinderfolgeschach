@@ -574,6 +574,20 @@ bool Position::leaves_king_safe(Move move) noexcept {
     return safe;
 }
 
+bool Position::must_follow() {
+    if (!valid_square(follow_)) {
+        return false;
+    }
+    MoveList candidates;
+    generate_pseudo_to(candidates, follow_);
+    for (Move move : candidates) {
+        if (leaves_king_safe(move)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void Position::generate_legal_moves(MoveList& result) {
     result.clear();
     MoveList candidates;

@@ -247,6 +247,18 @@ void test_null_move_pruning_is_exercised_and_guarded() {
     CHECK(exercised.null_cutoffs > 0);
     CHECK(exercised.null_cutoffs <= exercised.null_verifications);
     CHECK(exercised.null_verifications <= exercised.null_searches);
+    CHECK(exercised.lmr_searches > 0);
+    CHECK(exercised.lmr_researches <= exercised.lmr_searches);
+
+    zfs::engine::TranspositionTable full_width_table(4);
+    zfs::engine::Searcher full_width_searcher(full_width_table);
+    limits.late_move_reductions = false;
+    const auto full_width =
+        full_width_searcher.search(zfs::Game{}, limits, {}, stop);
+    CHECK(full_width.lmr_searches == 0);
+    CHECK(full_width.best_move == exercised.best_move);
+    CHECK(full_width.score == exercised.score);
+    limits.late_move_reductions = true;
 
     auto old_clock = load(
         "4k3/8/8/8/8/8/8/R3K3 w - - 91 46 -");

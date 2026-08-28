@@ -82,6 +82,7 @@ public:
 
     [[nodiscard]] bool is_square_attacked(Square square, Color by) const noexcept;
     [[nodiscard]] bool in_check(Color color) const noexcept;
+    [[nodiscard]] bool must_follow();
 
     void generate_legal_moves(MoveList& result);
     [[nodiscard]] MoveList legal_moves();

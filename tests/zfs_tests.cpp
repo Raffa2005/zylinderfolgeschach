@@ -247,9 +247,11 @@ void test_cylindrical_piece_movement() {
 
 void test_follow_legality() {
     auto forced = load("7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3");
+    CHECK(forced.must_follow());
     CHECK(move_names(forced) == std::set<std::string>{"a1a3"});
 
     auto pinned = load("1k2r3/8/8/8/8/8/4R3/4K3 w - - 0 1 c2");
+    CHECK(!pinned.must_follow());
     const auto pinned_moves = move_names(pinned);
     CHECK(!pinned_moves.empty());
     CHECK(!pinned_moves.contains("e2c2"));
@@ -259,10 +261,12 @@ void test_follow_legality() {
 
     auto checked_follow =
         load("1k2r3/8/8/8/8/8/R7/4K3 w - - 0 1 e2");
+    CHECK(checked_follow.must_follow());
     CHECK(move_names(checked_follow) == std::set<std::string>{"a2e2"});
 
     auto checked_fallback =
         load("1k2r3/8/8/8/8/8/R7/4K3 w - - 0 1 c2");
+    CHECK(!checked_fallback.must_follow());
     const auto fallback_moves = move_names(checked_fallback);
     CHECK(!fallback_moves.empty());
     CHECK(std::ranges::none_of(fallback_moves, [](const std::string& move) {
