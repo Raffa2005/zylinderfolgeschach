@@ -1,0 +1,14 @@
+{
+  "id": "ZFS-0",
+  "commit": "ddbcfad87b479c948ca32b3eeb44e82a8b8cd76d",
+  "baseline_binaries": {
+    "zfs_bench": "79222bcad132f91e837acfcd21e4464a5d97d17f191444a54fcd701f7a3054a8",
+    "zfs_engine": "6bfdf5d99e14676a6c805dc9fe8244c38e7dc0c8709df9dcff3bef145d281352",
+    "zfs_match": "c8dd3d559de56795b92f94c1e86386b5867a75f4c503809ad8ffde35fc67aa0c",
+    "zfs_stats": "a1b5a4efa3af6a90bcd15e39ce0a57760f51f617e60ee263da21102605909bf5"
+  },
+  "opening_suites": {
+    "openings/holdout-v1.txt": "546ee26bea69d4da509f29bf7bce24296a573d3e58f46efe24f280cc677a80b7",
+    "openings/screen-v1.txt": "71eb10c3ed2bb5e6455be0e12b6c0e4095b07eac92179938f36d95fbe0d52dea"
+  }
+}
