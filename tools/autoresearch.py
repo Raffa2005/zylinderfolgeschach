@@ -400,6 +400,38 @@ def record_decision(args: argparse.Namespace) -> int:
     return 0
 
 
+def recover_match(args: argparse.Namespace) -> int:
+    root = Path(__file__).resolve().parents[1]
+    raw_path = (root / args.raw_log).resolve()
+    try:
+        relative = raw_path.relative_to(root)
+    except ValueError as error:
+        raise ExperimentError("raw match log must be inside the repository") from error
+    with raw_path.open(encoding="utf-8") as stream:
+        manifest = json.loads(stream.readline())
+    if manifest.get("type") != "manifest":
+        raise ExperimentError("raw match log has no manifest header")
+    match = parse_match(raw_path)
+    match["raw_log"] = str(relative)
+    match["raw_log_sha256"] = sha256_file(raw_path)
+    append_ledger(
+        (root / args.ledger).resolve(),
+        {
+            "event": "recovered_match",
+            "name": args.name,
+            "candidate_id": manifest["candidate"]["id"],
+            "reference_id": manifest["baseline"]["id"],
+            "opening_fingerprint": manifest["openings"]["content_fnv1a64"],
+            "limits": manifest["limit"],
+            "match": match,
+            "note": args.note,
+            "recovered_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        },
+    )
+    print(json.dumps(match, indent=2, sort_keys=True))
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     subparsers = result.add_subparsers(dest="command", required=True)
@@ -431,6 +463,15 @@ def parser() -> argparse.ArgumentParser:
     decision.add_argument("--reason", required=True)
     decision.add_argument("--ledger", default="autoresearch/ledger.jsonl")
     decision.set_defaults(function=record_decision)
+
+    recover = subparsers.add_parser(
+        "recover", help="record a separately validated completed match log"
+    )
+    recover.add_argument("--name", required=True)
+    recover.add_argument("--raw-log", required=True)
+    recover.add_argument("--note", required=True)
+    recover.add_argument("--ledger", default="autoresearch/ledger.jsonl")
+    recover.set_defaults(function=recover_match)
     return result
 
 
