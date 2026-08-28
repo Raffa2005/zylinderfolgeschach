@@ -85,7 +85,7 @@ public:
             }
             const std::string& command = words[0];
             if (command == "uci") {
-                send("id name ZFS");
+                send("id name Kugelfisch");
                 send("id author OpenAI and Rafael");
                 send("option name Hash type spin default 64 min 1 max " +
                      std::to_string(TranspositionTable::kMaximumMegabytes));

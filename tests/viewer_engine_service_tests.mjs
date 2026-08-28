@@ -27,7 +27,7 @@ assert.deepEqual(
     pv: ['e2e4', 'a7a5'],
   },
 );
-assert.equal(parseInfoLine('id name ZFS'), null);
+assert.equal(parseInfoLine('id name Kugelfisch'), null);
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const service = await startViewerServer({

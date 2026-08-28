@@ -1,10 +1,11 @@
-# ZFS
+# Kugelfisch
 
 [![CI](https://github.com/Raffa2005/zylinderfolgeschach/actions/workflows/ci.yml/badge.svg)](https://github.com/Raffa2005/zylinderfolgeschach/actions/workflows/ci.yml)
 
-ZFS is a dependency-free C++20 rules core for Zylinderfolgeschach: chess on a
-file-wrapped cylinder with a mandatory move to the previous move's origin when
-such a move is otherwise legal.
+Kugelfisch is a dependency-free C++20 implementation of Zylinderfolgeschach
+(ZFS): chess on a file-wrapped cylinder with a mandatory move to the previous
+move's origin when such a move is otherwise legal. It includes the exact rules
+core, a single-worker UCI engine, and a browser playing surface.
 
 The normative variant specification is [RULES.md](RULES.md). Engineering and
 semantic choices are recorded in [DECISIONS.md](DECISIONS.md). The implemented
@@ -44,8 +45,9 @@ ctest --test-dir build-sanitize --output-on-failure
 
 ## UCI engine
 
-`zfs_engine` is a deterministic, single-search-worker UCI engine with exact
-principal-variation alpha-beta search and material-only evaluation:
+`zfs_engine` identifies itself as **Kugelfisch** over UCI. It is a deterministic,
+single-search-worker engine with principal-variation alpha-beta search and
+material-only evaluation:
 
 ```sh
 ./build/zfs_engine
@@ -168,6 +170,7 @@ Set `ZFS_ENGINE_PATH` to use an engine outside `build/zfs_engine`, and
 
 ## License
 
-ZFS is free software licensed under GPL-3.0-or-later. See [LICENSE](LICENSE).
+Kugelfisch is free software licensed under GPL-3.0-or-later. See
+[LICENSE](LICENSE).
 Third-party viewer dependencies are listed in
 [viewer/THIRD_PARTY.md](viewer/THIRD_PARTY.md).

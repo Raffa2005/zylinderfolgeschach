@@ -1,7 +1,8 @@
-# ZFS engine baseline and roadmap
+# Kugelfisch engine and roadmap
 
-Status: the single-worker baseline described below is implemented. Detailed
-rationales and measured tradeoffs are recorded in [DECISIONS.md](DECISIONS.md).
+Status: the first single-worker autoresearch champion described below is
+implemented. Detailed rationales and measured tradeoffs are recorded in
+[DECISIONS.md](DECISIONS.md) and [autoresearch/RESULTS.md](autoresearch/RESULTS.md).
 
 ## Implemented pipeline
 
@@ -11,9 +12,10 @@ UCI controller thread
                 |
                 v
 one search worker
-  iterative deepening -> fail-soft PVS/alpha-beta -> quiescence
-                |                         |
-                |                         +-> material-only evaluation
+  iterative deepening -> PVS/alpha-beta -> exact-subset quiescence
+                |              |                    |
+                |              |                    +-> material-only evaluation
+                |              +-> guarded null move and conservative LMR
                 +-> exact history draws, ordering, history-qualified TT
                 |
                 v
@@ -43,7 +45,7 @@ TT scores use the raw position, halfmove clock, and a reversible-history context
 signature. Position-only matches cannot safely reuse scores because draw rights
 are path-dependent. Actual draw adjudication never relies on a hash.
 
-## Search baseline
+## Search champion
 
 The main search currently has:
 
@@ -51,16 +53,19 @@ The main search currently has:
 - fail-soft negamax alpha-beta with exact principal-variation search;
 - mate-distance bounds and ply-normalized TT mate scores;
 - TT, promotion/capture, killer, and quiet-history ordering;
+- verified null-move pruning with a separate synthetic TT score domain;
+- one-ply, late-seven LMR with exact parent/child follow guards;
 - fixed depth, node, time, clock/increment, infinite, mate, and root-move limits;
 - the last completely searched iteration as the reported result.
 
 Legal generation proves ordinary non-king, non-en-passant moves safe without a
 make/unmake when their origin is not a king-ray blocker. Ambiguous cases retain
-the exact simulation fallback. At an ordinary quiescence node, only captures
-and promotions enter its move-ordering loop.
+the exact simulation fallback. Quiescence directly generates its required move
+subset rather than building and filtering every legal move.
 
-It deliberately has no null move, LMR, futility, razoring, SEE, or unchecked
-extensions. Those techniques are not assumed safe under mandatory follow.
+It deliberately has no futility, razoring, SEE, unchecked extensions,
+countermove table, or qsearch TT. Those measured candidates either lost strength
+or failed their engineering gate under mandatory follow.
 
 Quiescence searches every legal move when checked or forced to follow. At an
 ordinary choice node it uses material stand pat and searches captures and
@@ -120,9 +125,9 @@ starting, so there is never more than one CPU-intensive search.
 
 ## Deliberately later
 
-1. Build tactical and self-play corpora before adding evaluation terms.
-2. Measure variant-safe reductions individually against the exhaustive
-   reference modes. A measured root aspiration trial was too small to retain.
+1. Expand tactical and self-play corpora before adding evaluation terms.
+2. Measure any further variant-safe reductions individually. The first cycle's
+   rejected heuristics remain evidence, not dormant feature flags.
 3. Design and solve ZFS tablebases through four pieces, including follow and
    auxiliary-state indexing and proven cylinder symmetries.
 4. Add parallel search as a separate milestone, initially with per-worker

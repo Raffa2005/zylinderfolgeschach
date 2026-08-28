@@ -21,6 +21,7 @@ read_until() {
 }
 
 printf 'uci\n' >&3
+read_until 'id name Kugelfisch'
 read_until 'uciok'
 printf 'isready\n' >&3
 read_until 'readyok'

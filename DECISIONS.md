@@ -418,10 +418,10 @@ and their consequences, not the code line by line.
     250-centipawn root aspiration window saved roughly 0.05 percent of the
     depth-10 nodes and no wall time, so it was removed. Skipping reversible
     history-context maintenance in quiescence saved less than one percent while
-    introducing a second path-state regime, so it was also removed. Incremental
-    material, SEE, null move, LMR, and futility remain candidates, not assumed
-    wins; the selective techniques need variant-specific tactical tests before
-    they may change which branches are searched.
+    introducing a second path-state regime, so it was also removed. At this
+    checkpoint incremental material, SEE, null move, LMR, and futility remained
+    candidates rather than assumed wins. Decisions 62 and 63 record the later,
+    measured promotion of guarded null move and LMR; the others remain absent.
 
 ## Change evaluation
 
@@ -491,3 +491,63 @@ and their consequences, not the code line by line.
     request is rejected explicitly. Unsupported UCI options are never sent, and
     support is recorded in the manifest. Explicit `Clear Hash` is redundant
     because the process is new.
+
+## First autoresearch cycle
+
+61. **ZFS-0 is the permanent zero-Elo reference.** Commit `ddbcfad` and its
+    frozen native binaries define 0 Elo. Candidate builds, the rules referee,
+    opening bytes, limits, source diff, and raw paired-game logs are hashed into
+    an append-only ledger. Routine screens never rewrite the baseline. A change
+    is promoted only after correctness, deterministic-work, self-play, and
+    adversarial-review evidence are considered separately; a statistically
+    inconclusive test is reported as such rather than dressed up as proof.
+
+62. **Guarded, verified null-move pruning is retained.** It runs only in a
+    null-window node at depth five or greater, outside check, compulsory follow,
+    mate-score, near-rule-50, pawn-only, and static-fail-low regions. Consecutive
+    nulls are forbidden and every null fail-high receives a verification search.
+    Synthetic paths have a permanent TT score domain, restore all clocks and
+    auxiliary fields, and never use real-path repetition adjudication. The first
+    version was rejected when review found that an irreversible synthetic move
+    could erase a temporary domain marker; no result from that version was
+    credited to the corrected implementation.
+
+63. **Late-move reductions are narrow and follow-aware.** Only the seventh and
+    later moves at a null-window node of depth at least five with at least eight
+    legal moves are eligible. The one-ply reduction excludes checks, parent or
+    child compulsory follow, captures, promotions, castling, the TT move, and
+    both killers. An alpha-raising reduced result is re-searched at full depth.
+    The earlier fourth-move/depth-four schedule was faster but lost its screen
+    and was removed.
+
+64. **Quiescence generates its exact required subset directly.** Active follow
+    and check still generate every legal reply. Ordinary nodes generate captures
+    and every promotion, including quiet promotions; an empty tactical subset
+    performs only enough quiet legality work to distinguish an ordinary position
+    from stalemate. A differential oracle covers deterministic play plus forced
+    and inactive follow, cylinder en passant, promotion, mate, and stalemate.
+    Fixed-depth behavior stayed identical while median depth-nine time improved
+    by about 23 percent.
+
+65. **Evaluation remains conventional material.** Pawn 100, knight 320, bishop
+    330, rook 500, and queen 900 remain the complete evaluator. A cylindrical
+    bishop increase to 360 was positive in a smoke and exactly neutral in its
+    independent confirmation; 390 was worse and expanded the tree. Mobility,
+    conventional file-centrality, king terms, and follow bonuses are not added
+    without variant evidence.
+
+66. **Rejected heuristics leave no dormant machinery.** History gravity and
+    maluses, a qsearch TT, countermove ordering, unbudgeted unique-follow
+    extensions, and two depth-one quiet-futility schedules all failed their
+    declared work or strength gates and were removed. Their source hashes,
+    measurements, and rejection reasons remain in `autoresearch/ledger.jsonl`
+    and are summarized in `autoresearch/RESULTS.md`. The resulting champion cuts
+    the depth-nine benchmark from 11,425,195 to 4,201,814 nodes and interleaved
+    median time from 3,416 to 1,114 ms versus ZFS-0. Its 32-pair final timed
+    checkpoint scored 51.56%, with a wide and inconclusive confidence interval.
+
+67. **The public engine name is Kugelfisch; ZFS remains the variant and code
+    vocabulary.** UCI and the playing surface use Kugelfisch. Executable names,
+    namespaces, ZFS-FEN, protocol extensions, environment variables, and rules
+    terminology keep `zfs` because renaming those stable interfaces would create
+    migration work without changing the product identity.
