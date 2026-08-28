@@ -131,7 +131,10 @@ The public surface uses a fixed dark/gold theme and a sparse landing page with
 focused Play, Games, and Analysis routes. Play defaults to the server engine at
 depth 10 without clocks and excludes evaluation, PV, node counts, and arbitrary
 position loading. Those technical controls live in Analysis, whose search
-streams information without applying `bestmove`. Played games are appended to a
+streams information without applying `bestmove`, displays scores from White's
+perspective, and draws the current legal PV move as a board arrow. Move history
+and PV notation are converted to SAN by the C++ rules bridge, with UCI as the
+failure fallback. Played games are appended to a
 bounded local store as their move prefix grows; Games pages through those
 records and replays each line through the WebAssembly rules core. Historical
 navigation is read-only and returning to the live cursor resumes the game.

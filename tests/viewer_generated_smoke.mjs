@@ -7,11 +7,16 @@ const module = await createZfsModule();
 const reset = module.cwrap('zfs_reset', null, []);
 const load = module.cwrap('zfs_load', 'number', ['string']);
 const play = module.cwrap('zfs_play', 'number', ['string']);
+const lineSan = module.cwrap('zfs_line_san', 'string', ['string']);
 const state = module.cwrap('zfs_state_json', 'string', []);
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+reset();
+requireCondition(lineSan('e2e4 e7e5 g1f3') === 'e4 e5 Nf3',
+                 'generated WASM returned incorrect SAN');
 
 requireCondition(
   load(

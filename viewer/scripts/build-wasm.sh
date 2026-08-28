@@ -16,7 +16,7 @@ else
 fi
 
 mkdir -p "${viewer_dir}/src/generated"
-exported_functions='["_zfs_reset","_zfs_load","_zfs_play","_zfs_back","_zfs_forward","_zfs_last_error","_zfs_state_json"]'
+exported_functions='["_zfs_reset","_zfs_load","_zfs_play","_zfs_back","_zfs_forward","_zfs_last_error","_zfs_state_json","_zfs_line_san"]'
 
 "${compiler}" \
     -std=c++20 -O3 -flto -DNDEBUG -fno-exceptions -fno-rtti \

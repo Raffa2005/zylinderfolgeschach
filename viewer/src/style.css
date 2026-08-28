@@ -121,12 +121,7 @@ textarea {
 .brand-mark {
   width: 30px;
   height: 30px;
-  border: 1px solid #70685d;
-  border-radius: 7px;
-  display: inline-grid;
-  place-items: center;
-  color: var(--accent);
-  font: 850 16px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: block;
 }
 
 .site-nav { display: flex; align-items: center; gap: 5px; }
@@ -318,6 +313,19 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 .board cg-board square.move-dest { background: radial-gradient(rgba(30, 23, 13, .5) 0 18%, transparent 20%); }
 .board cg-board square.move-dest.oc { background: radial-gradient(transparent 0 68%, rgba(30, 23, 13, .5) 70% 82%, transparent 84%); }
 .board cg-board square.last-move { background: rgba(215, 166, 74, .32); }
+.board cg-board square.follow-field {
+  background-image: radial-gradient(circle, transparent 0 55%, #e7b532 57% 64%, transparent 66%);
+}
+.board cg-board square.follow-field.move-dest {
+  background-image:
+    radial-gradient(circle, rgba(30, 23, 13, .5) 0 18%, transparent 20%),
+    radial-gradient(circle, transparent 0 55%, #e7b532 57% 64%, transparent 66%);
+}
+.board cg-board square.follow-field.move-dest.oc {
+  background-image:
+    radial-gradient(circle, transparent 0 68%, rgba(30, 23, 13, .5) 70% 82%, transparent 84%),
+    radial-gradient(circle, transparent 0 55%, #e7b532 57% 64%, transparent 66%);
+}
 .board coords { font: 800 10px/1 ui-monospace, monospace; opacity: .8; }
 
 .seam {
@@ -348,6 +356,13 @@ legend, .field > label { display: block; margin-bottom: 8px; }
 
 .game-console, .analysis-console, .side-stack { display: grid; gap: 9px; }
 .position-card { background: linear-gradient(135deg, #2b2823, #24211e); }
+.position-card.terminal {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(215, 166, 74, .17), #24211e 70%);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, .3), inset 4px 0 0 var(--accent);
+}
+.position-card.terminal .status-line strong { color: var(--accent); font-size: 19px; }
+.position-card.terminal .turn-dot { display: none; }
 .status-line { display: flex; align-items: center; gap: 11px; }
 .status-line div > strong, .status-line div > span { display: block; }
 .status-line div > span { margin-top: 3px; color: var(--muted); font-size: 11px; }

@@ -6,10 +6,11 @@
     <meta name="description" content="Analyze Zylinderfolgeschach positions with Kugelfisch." />
     <meta name="theme-color" content="#171614" />
     <title>Analysis · Kugelfisch</title>
+    <link rel="icon" href="/mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body data-page="analysis">
-    <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games">Games</a><a href="/analysis" aria-current="page">Analysis</a></nav></div></header>
+    <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><img class="brand-mark" src="/mark.svg" alt="" />Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games">Games</a><a href="/analysis" aria-current="page">Analysis</a></nav></div></header>
     <main class="site-shell page-main" id="main">
       <div class="page-heading"><h1>Analysis</h1><span id="analysis-connection" class="connection">Connecting…</span></div>
       <p id="analysis-source" class="message" hidden></p>
@@ -19,7 +20,7 @@
           <div class="board-actions"><button id="analysis-flip" type="button">Flip board</button><button id="analysis-reset" type="button">Reset</button></div>
         </div>
         <aside class="analysis-console">
-          <section class="panel position-card"><div class="status-line"><span id="analysis-turn-dot" class="turn-dot"></span><div><strong id="analysis-status">Loading…</strong><span id="analysis-status-detail"></span></div></div></section>
+          <section class="panel position-card" id="analysis-position-card"><div class="status-line"><span id="analysis-turn-dot" class="turn-dot"></span><div><strong id="analysis-status">Loading…</strong><span id="analysis-status-detail"></span></div></div></section>
           <section class="panel engine-panel">
             <div class="panel-heading"><h2>Kugelfisch</h2><span id="analysis-engine-state" class="connection">Offline</span></div>
             <div class="analysis-controls"><select id="analysis-depth" aria-label="Analysis depth"><option value="8">Depth 8</option><option value="10" selected>Depth 10</option><option value="12">Depth 12</option><option value="14">Depth 14</option></select><button id="analysis-toggle" class="primary" type="button" disabled>Analyze</button></div>

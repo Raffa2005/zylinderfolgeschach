@@ -79,7 +79,13 @@ try {
   assert.equal(pageResponse.status, 200);
   const page = await pageResponse.text();
   assert.match(page, /<h1>Kugelfisch<\/h1>/);
+  assert.match(page, /Zylinderfolgeschach-Engine/);
   assert.doesNotMatch(page, /Rules|theme-toggle|The board wraps/);
+
+  const markResponse = await fetch(`${service.url}/mark.svg`);
+  assert.equal(markResponse.status, 200);
+  assert.equal(markResponse.headers.get('content-type'), 'image/svg+xml');
+  assert.match(await markResponse.text(), /<svg/);
 
   const playResponse = await fetch(`${service.url}/play`);
   assert.equal(playResponse.status, 200);

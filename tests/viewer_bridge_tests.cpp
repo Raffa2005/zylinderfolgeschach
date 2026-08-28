@@ -41,6 +41,7 @@ void test_initial_and_forced_follow() {
     CHECK(zfs_play("a1a3") == 1);
     CHECK(contains(state(), "\"historyCursor\":1"));
     CHECK(contains(state(), "\"history\":[\"a1a3\"]"));
+    CHECK(contains(state(), "\"sanHistory\":[\"Ra3\"]"));
     CHECK(zfs_back() == 1);
     CHECK(contains(state(), "\"historyCursor\":0"));
     CHECK(contains(state(), "\"history\":[\"a1a3\"]"));
@@ -65,6 +66,8 @@ void test_navigation_and_branching() {
     const std::string end = state();
     CHECK(contains(end, "\"historyCursor\":2"));
     CHECK(contains(end, "\"history\":[\"e2e4\",\"e7e5\"]"));
+    CHECK(contains(end, "\"sanHistory\":[\"e4\",\"e5\"]"));
+    CHECK(std::string_view(zfs_line_san("g1f3 b8c6")) == "Nf3 Nc6");
     CHECK(zfs_forward() == 0);
     CHECK(state() == end);
 
@@ -84,24 +87,34 @@ void test_navigation_and_branching() {
     CHECK(contains(branch, "\"historyCursor\":2"));
     CHECK(contains(branch, "\"history\":[\"e2e4\",\"c7c5\"]"));
     CHECK(!contains(branch, "e7e5"));
+    CHECK(contains(branch, "\"sanHistory\":[\"e4\",\"c5\"]"));
     CHECK(zfs_forward() == 0);
 }
 
 void test_special_moves_and_castle_canonicalization() {
     CHECK(zfs_load("4k3/8/8/8/p6P/8/8/4K3 b - h3 0 1 h2") == 1);
     CHECK(zfs_play("a4h3") == 1);
+    CHECK(contains(state(), "\"sanHistory\":[\"axh3\"]"));
     CHECK(contains(state(),
                    "\"fen\":\"4k3/8/8/8/8/7p/8/4K3 w - - 0 2 a4\""));
 
     CHECK(zfs_load("r1k5/7P/8/8/8/8/8/4K3 w - - 0 1 -") == 1);
     CHECK(zfs_play("h7a8q") == 1);
+    CHECK(contains(state(), "\"sanHistory\":[\"hxa8=Q+\"]"));
     CHECK(contains(state(),
                    "\"fen\":\"Q1k5/8/8/8/8/8/8/4K3 b - - 0 1 h7\""));
 
     CHECK(zfs_load("4k3/8/8/8/8/8/8/4K2R w K - 0 1 -") == 1);
     CHECK(zfs_play("e1g1") == 1);
+    CHECK(contains(state(), "\"sanHistory\":[\"O-O\"]"));
     CHECK(contains(state(),
                    "\"fen\":\"4k3/8/8/8/8/8/8/5RK1 b - - 1 1 -\""));
+}
+
+void test_san_disambiguation() {
+    CHECK(zfs_load("4k3/8/8/8/8/8/4K3/R1R5 w - - 0 1 -") == 1);
+    CHECK(zfs_play("a1b1") == 1);
+    CHECK(contains(state(), "\"sanHistory\":[\"Rab1\"]"));
 }
 
 void test_automatic_draws() {
@@ -132,6 +145,7 @@ int main() {
     test_initial_and_forced_follow();
     test_navigation_and_branching();
     test_special_moves_and_castle_canonicalization();
+    test_san_disambiguation();
     test_automatic_draws();
     if (failures != 0) {
         std::cerr << failures << " viewer bridge test(s) failed\n";

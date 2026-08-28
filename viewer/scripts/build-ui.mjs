@@ -32,6 +32,7 @@ for (const [source, destination] of [
   ['play.html', 'play/index.html'],
   ['games.html', 'games/index.html'],
   ['analysis.html', 'analysis/index.html'],
+  ['mark.svg', 'mark.svg'],
 ]) {
   const output = path.join(outputDirectory, destination);
   await mkdir(path.dirname(output), { recursive: true });

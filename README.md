@@ -155,7 +155,9 @@ there are no clocks and depth 10 is the default. Legal destinations, the follow
 field, and move history remain visible, while score, nodes, principal variation,
 and arbitrary-position loading are deliberately absent. Left/Right review the
 move line without allowing a historical position to fork the played game;
-returning to the live position safely resumes play.
+returning to the live position safely resumes play. Move lists use SAN derived
+by the C++ variant rules core, with UCI retained as a fallback rather than
+reimplemented in the page.
 
 After every engine move, the service uses the second move of the completed PV
 as the expected human reply and searches that resulting position with UCI
@@ -169,6 +171,9 @@ Every played game is saved as it progresses in
 the detail view supports the move list, arrow keys, and an Analysis handoff.
 Analysis is the separate technical workspace: it exposes ZFS-FEN loading,
 score, depth, nodes, and principal variation without making an engine move.
+Its score is always shown from White's perspective, and the first legal move of
+the current PV is drawn on the board. PV and history notation use the same
+rule-aware SAN conversion as Play.
 Saved lines are replayed through the production WebAssembly rules core rather
 than trusted as diagrams.
 

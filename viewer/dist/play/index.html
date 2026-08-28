@@ -6,12 +6,13 @@
     <meta name="description" content="Play Zylinderfolgeschach against Kugelfisch." />
     <meta name="theme-color" content="#171614" />
     <title>Play · Kugelfisch</title>
+    <link rel="icon" href="/mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/app.css" />
   </head>
   <body data-page="play">
     <header class="site-header">
       <div class="site-shell header-inner">
-        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↔</span>Kugelfisch</a>
+        <a class="brand" href="/"><img class="brand-mark" src="/mark.svg" alt="" />Kugelfisch</a>
         <nav class="site-nav" aria-label="Primary navigation">
           <a href="/play" aria-current="page">Play</a><a href="/games">Games</a><a href="/analysis">Analysis</a>
         </nav>
@@ -48,7 +49,7 @@
             <div class="player-strip"><div><strong id="bottom-player">You</strong><span id="bottom-player-meta"></span></div><span id="bottom-player-state" class="side-state"></span></div>
           </div>
           <aside class="game-console">
-            <section class="panel position-card" aria-live="polite">
+            <section class="panel position-card" id="position-card" aria-live="polite">
               <div class="status-line"><span id="turn-dot" class="turn-dot"></span><div><strong id="status">Loading…</strong><span id="status-detail"></span></div></div>
               <p id="engine-status" class="engine-status">Ready</p>
             </section>

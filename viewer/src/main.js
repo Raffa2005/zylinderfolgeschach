@@ -14,6 +14,7 @@ const api = {
   forward: module.cwrap('zfs_forward', 'number', []),
   error: module.cwrap('zfs_last_error', 'string', []),
   state: module.cwrap('zfs_state_json', 'string', []),
+  lineSan: module.cwrap('zfs_line_san', 'string', ['string']),
 };
 
 const MOVE_PATTERN = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
@@ -56,11 +57,14 @@ function sideName(color) {
 }
 
 function terminalText(state) {
-  if (state.terminal === 'checkmate') return `${sideName(state.turn)} is checkmated`;
+  if (state.terminal === 'checkmate') {
+    const winner = state.turn === 'white' ? 'black' : 'white';
+    return `Checkmate · ${sideName(winner)} wins`;
+  }
   const labels = {
-    'fifty-move': 'Draw by 50-move rule',
-    stalemate: 'Stalemate',
-    threefold: 'Draw by repetition',
+    'fifty-move': 'Draw · 50-move rule',
+    stalemate: 'Draw · Stalemate',
+    threefold: 'Draw · Repetition',
   };
   return labels[state.terminal] ?? `${sideName(state.turn)} to move`;
 }
@@ -71,12 +75,13 @@ function followText(state) {
   return 'No follow field';
 }
 
-function formatScore(score) {
+function formatScore(score, turn) {
   if (!score) return '—';
+  const value = turn === 'black' ? -score.value : score.value;
   if (score.kind === 'mate') {
-    return score.value < 0 ? `−M${Math.abs(score.value)}` : `+M${score.value}`;
+    return value < 0 ? `−M${Math.abs(value)}` : `+M${value}`;
   }
-  const pawns = score.value / 100;
+  const pawns = value / 100;
   return `${pawns >= 0 ? '+' : ''}${pawns.toFixed(2)}`;
 }
 
@@ -118,23 +123,28 @@ function createBoard(element, state, afterMove) {
   });
 }
 
-function boardUpdate(state, movable, orientation) {
+function boardUpdate(state, movable, orientation, engineMove) {
   const lastMove = state.history[state.historyCursor - 1];
+  const arrow = MOVE_PATTERN.test(engineMove ?? '') &&
+    state.legalMoves.includes(engineMove)
+    ? [{ orig: engineMove.slice(0, 2), dest: engineMove.slice(2, 4), brush: 'green' }]
+    : [];
   return {
     fen: state.board,
     orientation,
     turnColor: state.turn,
     check: state.inCheck ? state.turn : false,
     lastMove: lastMove ? [lastMove.slice(0, 2), lastMove.slice(2, 4)] : [],
+    highlight: {
+      custom: state.follow === '-'
+        ? new Map()
+        : new Map([[state.follow, 'follow-field']]),
+    },
     movable: {
       color: movable ? state.turn : undefined,
       dests: movable ? destinations(state.legalMoves) : new Map(),
     },
-    drawable: {
-      autoShapes: state.follow === '-'
-        ? []
-        : [{ orig: state.follow, brush: 'yellow' }],
-    },
+    drawable: { autoShapes: arrow },
   };
 }
 
@@ -155,7 +165,7 @@ function renderMoveHistory(container, state, onSelect) {
       button.classList.add('current');
       current = button;
     }
-    button.textContent = `${index + 1}. ${move}`;
+    button.textContent = `${index + 1}. ${state.sanHistory?.[index] ?? move}`;
     button.addEventListener('click', () => onSelect(index + 1));
     container.append(button);
   });
@@ -262,6 +272,7 @@ async function initializePlay() {
     engineStatus: element('engine-status'), error: element('error'), flip: element('flip'),
     forward: element('forward'), gameView: element('game-view'), history: element('history'),
     live: element('live-position'), newGame: element('new-game'), ply: element('ply-count'),
+    positionCard: element('position-card'),
     promotionChoices: element('promotion-choices'), promotionDialog: element('promotion-dialog'),
     setupConnection: element('setup-connection'), setupForm: element('setup-form'),
     setupMessage: element('setup-message'), setupView: element('setup-view'),
@@ -314,12 +325,16 @@ async function initializePlay() {
   function render() {
     if (!elements.gameView.hidden) ensureBoard().set(boardUpdate(state, canMove(), orientation));
     const reviewing = state.historyCursor !== state.history.length;
+    const terminal = state.terminal !== 'ongoing' && !reviewing;
     elements.status.textContent = reviewing
       ? `Move ${state.historyCursor} of ${state.history.length}`
       : state.terminal === 'ongoing'
         ? `${sideName(state.turn)} to move`
         : terminalText(state);
-    elements.statusDetail.textContent = `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
+    elements.statusDetail.textContent = terminal
+      ? ''
+      : `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
+    elements.positionCard.classList.toggle('terminal', terminal);
     elements.turnDot.className = `turn-dot ${state.turn}`;
     elements.engineStatus.textContent = engine.message;
     elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;
@@ -736,6 +751,7 @@ async function initializeAnalysis() {
     load: element('analysis-load'), nodes: element('analysis-nodes'),
     ply: element('analysis-ply-count'), promotionChoices: element('analysis-promotion-choices'),
     promotionDialog: element('analysis-promotion-dialog'), pv: element('analysis-pv'),
+    positionCard: element('analysis-position-card'),
     reset: element('analysis-reset'), score: element('analysis-score'),
     source: element('analysis-source'), start: element('analysis-start'),
     status: element('analysis-status'), statusDetail: element('analysis-status-detail'),
@@ -760,18 +776,24 @@ async function initializeAnalysis() {
   }
 
   function render() {
-    ground.set(boardUpdate(state, canMove(), orientation));
+    ground.set(boardUpdate(state, canMove(), orientation, analysis?.pv?.[0]));
     elements.status.textContent = state.terminal === 'ongoing'
       ? `${sideName(state.turn)} to move`
       : terminalText(state);
-    elements.statusDetail.textContent = `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
+    const terminal = state.terminal !== 'ongoing';
+    elements.statusDetail.textContent = terminal
+      ? ''
+      : `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
+    elements.positionCard.classList.toggle('terminal', terminal);
     elements.turnDot.className = `turn-dot ${state.turn}`;
     elements.fen.value = state.fen;
     elements.engineStatus.textContent = message;
-    elements.score.textContent = formatScore(analysis?.score);
+    elements.score.textContent = formatScore(analysis?.score, state.turn);
     elements.depthReadout.textContent = analysis?.depth === undefined ? 'Depth —' : `Depth ${analysis.depth}`;
     elements.nodes.textContent = analysis?.nodes === undefined ? '— nodes' : `${analysis.nodes.toLocaleString()} nodes`;
-    elements.pv.textContent = analysis?.pv?.length ? analysis.pv.join(' ') : 'No line.';
+    const uci = analysis?.pv?.join(' ') ?? '';
+    const san = uci ? api.lineSan(uci) : '';
+    elements.pv.textContent = san || uci || 'No line.';
     elements.toggle.textContent = controller ? 'Stop' : 'Analyze';
     elements.toggle.disabled = !available || state.terminal !== 'ongoing';
     elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;

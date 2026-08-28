@@ -660,3 +660,27 @@ and their consequences, not the code line by line.
     the human turn or starts a fresh engine search as appropriate. Stop and new
     search requests are awaited at this boundary so a late stop cannot kill the
     resumed search.
+
+80. **Browser notation is produced by the variant rules core.** Move history
+    and analysis PVs use SAN-like notation generated in C++ from the exact legal
+    move set at each position. Cylindrical captures, the follow restriction,
+    castling, promotions, check, mate, and legal disambiguation therefore do not
+    acquire a second JavaScript rules implementation. UCI remains the stored and
+    transmitted canonical format and is displayed if a supplied line cannot be
+    converted completely.
+
+81. **Follow and move indicators are composable square state.** The follow
+    field is a gold ring on a Chessground custom-highlight square, not a
+    competing SVG annotation. When the selected piece can legally reach that
+    field, the ordinary destination dot is layered inside the ring; legal
+    captures retain their capture outline. This is presentation only and does
+    not change move generation. Analysis draws only a still-legal first PV move,
+    and its evaluation is normalized to White's perspective at display time.
+
+82. **Terminal positions state only the result.** Checkmate and draw outcomes
+    receive a visually distinct status panel, while follow-field diagnostics are
+    suppressed once the game is over. The same terminal language is used in Play
+    and Analysis. The cylinder arrow is a committed SVG favicon and header mark,
+    and the product descriptor is the literal
+    “Zylinderfolgeschach-Engine”—branding does not introduce another rules page
+    or marketing copy.

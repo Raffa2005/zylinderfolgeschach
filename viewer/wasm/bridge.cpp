@@ -14,8 +14,10 @@ namespace {
 
 std::vector<zfs::Position> timeline_positions{zfs::Position::start()};
 std::vector<std::string> timeline_moves;
+std::vector<std::string> timeline_san;
 std::size_t timeline_cursor = 0;
 std::string response;
+std::string notation_response;
 std::string last_error;
 
 [[nodiscard]] zfs::Position& current_position() noexcept {
@@ -27,6 +29,7 @@ void reset_timeline(zfs::Position initial) {
     timeline_positions.clear();
     timeline_positions.push_back(std::move(initial));
     timeline_moves.clear();
+    timeline_san.clear();
     timeline_cursor = 0;
 }
 
@@ -83,6 +86,75 @@ void append_json_string(std::string& output, std::string_view value) {
 }
 
 void set_error(std::string message) { last_error = std::move(message); }
+
+[[nodiscard]] char san_piece_letter(zfs::PieceType type) noexcept {
+    switch (type) {
+        case zfs::PieceType::Knight: return 'N';
+        case zfs::PieceType::Bishop: return 'B';
+        case zfs::PieceType::Rook: return 'R';
+        case zfs::PieceType::Queen: return 'Q';
+        case zfs::PieceType::King: return 'K';
+        case zfs::PieceType::Pawn:
+        case zfs::PieceType::None: return '\0';
+    }
+    return '\0';
+}
+
+[[nodiscard]] std::string move_san(const zfs::Position& before, zfs::Move move,
+                                   const zfs::MoveList& legal,
+                                   zfs::Position& after) {
+    std::string san;
+    if (move.type() == zfs::MoveType::KingCastle) {
+        san = "O-O";
+    } else if (move.type() == zfs::MoveType::QueenCastle) {
+        san = "O-O-O";
+    } else {
+        const zfs::PieceType type = zfs::piece_type(before.piece_at(move.from()));
+        const bool pawn = type == zfs::PieceType::Pawn;
+        if (!pawn) {
+            san.push_back(san_piece_letter(type));
+            bool ambiguous = false;
+            bool shares_file = false;
+            bool shares_rank = false;
+            for (zfs::Move candidate : legal) {
+                if (candidate == move || candidate.to() != move.to() ||
+                    zfs::piece_type(before.piece_at(candidate.from())) != type) {
+                    continue;
+                }
+                ambiguous = true;
+                shares_file |= zfs::file_of(candidate.from()) == zfs::file_of(move.from());
+                shares_rank |= zfs::rank_of(candidate.from()) == zfs::rank_of(move.from());
+            }
+            if (ambiguous) {
+                if (!shares_file) {
+                    san.push_back(static_cast<char>('a' + zfs::file_of(move.from())));
+                } else if (!shares_rank) {
+                    san.push_back(static_cast<char>('1' + zfs::rank_of(move.from())));
+                } else {
+                    san += square_name(move.from());
+                }
+            }
+        } else if (move.is_capture()) {
+            san.push_back(static_cast<char>('a' + zfs::file_of(move.from())));
+        }
+
+        if (move.is_capture()) {
+            san.push_back('x');
+        }
+        san += square_name(move.to());
+        if (move.is_promotion()) {
+            san.push_back('=');
+            san.push_back(san_piece_letter(move.promotion()));
+        }
+    }
+
+    if (after.in_check(after.side_to_move())) {
+        zfs::MoveList replies;
+        after.generate_legal_moves(replies);
+        san.push_back(replies.empty() ? '#' : '+');
+    }
+    return san;
+}
 
 [[nodiscard]] unsigned repetition_count() {
     const zfs::Position& current = current_position();
@@ -183,10 +255,14 @@ int zfs_play(const char* uci) {
     while (timeline_moves.size() > timeline_cursor) {
         timeline_moves.pop_back();
     }
+    while (timeline_san.size() > timeline_cursor) {
+        timeline_san.pop_back();
+    }
 
     zfs::Position next = current_position();
     zfs::Undo undo;
     next.do_move(*move, undo);
+    timeline_san.push_back(move_san(current_position(), *move, legal, next));
     timeline_moves.emplace_back(input);
     timeline_positions.push_back(std::move(next));
     ++timeline_cursor;
@@ -281,8 +357,68 @@ const char* zfs_state_json() {
         first = false;
         append_json_string(response, move);
     }
+    response += "],\"sanHistory\":[";
+    first = true;
+    for (const std::string& san : timeline_san) {
+        if (!first) {
+            response.push_back(',');
+        }
+        first = false;
+        append_json_string(response, san);
+    }
     response += "]}";
     return response.c_str();
+}
+
+const char* zfs_line_san(const char* uci_line) {
+    std::string_view input;
+    notation_response.clear();
+    if (!bounded_c_string(uci_line, 4096, input)) {
+        return notation_response.c_str();
+    }
+
+    zfs::Position position = current_position();
+    std::size_t offset = 0;
+    bool first = true;
+    while (offset < input.size()) {
+        while (offset < input.size() && input[offset] == ' ') {
+            ++offset;
+        }
+        if (offset == input.size()) {
+            break;
+        }
+        const std::size_t end = input.find(' ', offset);
+        const std::string_view token = input.substr(
+            offset, end == std::string_view::npos ? input.size() - offset
+                                                   : end - offset);
+        if (token.size() != 4 && token.size() != 5) {
+            notation_response.clear();
+            return notation_response.c_str();
+        }
+
+        zfs::MoveList legal;
+        position.generate_legal_moves(legal);
+        const auto found = std::find_if(
+            legal.begin(), legal.end(), [token](zfs::Move move) {
+                return move.uci() == token;
+            });
+        if (found == legal.end()) {
+            notation_response.clear();
+            return notation_response.c_str();
+        }
+
+        zfs::Position next = position;
+        zfs::Undo undo;
+        next.do_move(*found, undo);
+        if (!first) {
+            notation_response.push_back(' ');
+        }
+        first = false;
+        notation_response += move_san(position, *found, legal, next);
+        position = std::move(next);
+        offset = end == std::string_view::npos ? input.size() : end + 1U;
+    }
+    return notation_response.c_str();
 }
 
 }  // extern "C"
