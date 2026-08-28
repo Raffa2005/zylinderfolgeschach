@@ -5,7 +5,9 @@
   "compatibility_date": "2026-08-28",
   "d1_databases": [
     {
-      "binding": "DB"
+      "binding": "DB",
+      "database_name": "kugelfisch-games",
+      "database_id": "52e97322-2706-4fc6-b2d0-128cfa8db041"
     }
   ]
 }

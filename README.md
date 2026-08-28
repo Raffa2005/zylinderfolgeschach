@@ -194,9 +194,10 @@ service now supplies only static files and the saved-game database to the pages.
 
 ## Deploy the viewer to Cloudflare
 
-The production deployment target is Cloudflare Pages. The rules and engine run in
-the browser; only the saved-game API executes as a Pages Function, backed by D1.
-Static requests therefore do not use the laptop or an engine server.
+The production site is [kugelfisch.pages.dev](https://kugelfisch.pages.dev/),
+hosted by Cloudflare Pages. The rules and engine run in the browser; only the
+saved-game API executes as a Pages Function, backed by D1. Static requests
+therefore do not use the laptop or an engine server.
 
 Use Node 22 and authenticate Wrangler once:
 
@@ -205,6 +206,10 @@ cd viewer
 npm ci
 npx wrangler login
 ```
+
+For a remote VS Code or SSH session, use
+`npx wrangler login --device --browser=false` instead of the callback-based
+login command.
 
 For the first deployment, create the Western Europe database, apply the checked-
 in schema, create the Pages project, and deploy:
