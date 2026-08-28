@@ -68,4 +68,5 @@ ZFS-0 referee. Direct champion-versus-ZFS-0 checks report cumulative gain.
 `screen-v2` contains 256 independently generated, color-swapped training lines.
 `screen-v2-confirm` is a separately seeded 128-line training-validation pool.
 The original 32-line `screen-v1` remains frozen for reproducing early results;
-`holdout-v1` remains excluded from routine tuning.
+`holdout-v1` and the later 128-line `holdout-v2` remain excluded from routine
+tuning. A candidate lineage never reuses an already exposed holdout.
