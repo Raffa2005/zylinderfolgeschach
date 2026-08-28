@@ -123,6 +123,9 @@ reconstructing only the current diagram. A per-game token maps to
 `ucinewgame`: the TT is cleared between games and retained between moves of one
 game. Replacement requests send `stop` and wait for the old `bestmove` before
 starting, so there is never more than one CPU-intensive search.
+An unexpected native-engine exit causes one transparent process restart and
+replay of the interrupted search. User cancellation is not retried, and the
+second failure is surfaced instead of creating a crash loop.
 
 ## Verification gates already present
 
@@ -137,7 +140,7 @@ starting, so there is never more than one CPU-intensive search.
 - a check that the distribution embeds that tested WASM payload;
 - a localhost service test covering validation, streamed analysis, a
   forced-follow `bestmove`, replayed threefold history, and serialized
-  cancellation/replacement;
+  cancellation/replacement, plus an actual mid-search engine kill and recovery;
 - subprocess UCI handshake, analysis, automatic draw, parameter-boundary,
   ponder, and stop tests;
 - release plus ASan/UBSan runs.

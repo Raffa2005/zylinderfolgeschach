@@ -40,12 +40,21 @@ function asAbortError(reason, fallback = 'engine search aborted') {
   return error;
 }
 
+class EngineProcessError extends Error {
+  constructor(error) {
+    super(error instanceof Error ? error.message : String(error), { cause: error });
+    this.name = 'EngineProcessError';
+  }
+}
+
 function processError(code, signal, stderr) {
   const reason = signal
     ? `engine was terminated by ${signal}`
     : `engine exited with code ${code}`;
   const detail = stderr.trim();
-  return new Error(detail ? `${reason}: ${detail}` : reason);
+  return new EngineProcessError(
+    new Error(detail ? `${reason}: ${detail}` : reason),
+  );
 }
 
 export class UciEngineClient {
@@ -105,6 +114,23 @@ export class UciEngineClient {
   }
 
   async search({ gameId, rootFen, moves, depth, signal, onInfo = () => {} }) {
+    const request = { gameId, rootFen, moves, depth, signal, onInfo };
+    for (let attempt = 0; ; ++attempt) {
+      try {
+        return await this.searchOnce(request);
+      } catch (error) {
+        if (
+          attempt !== 0 ||
+          signal?.aborted ||
+          !(error instanceof EngineProcessError)
+        ) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  async searchOnce({ gameId, rootFen, moves, depth, signal, onInfo }) {
     await this.start();
     if (signal?.aborted) throw asAbortError(signal.reason);
     if (this.currentSearch) throw new Error('engine search is already active');
@@ -246,6 +272,9 @@ export class UciEngineClient {
 
   handleFailure(child, error) {
     if (this.child !== child) return;
+    const failure = error instanceof EngineProcessError
+      ? error
+      : new EngineProcessError(error);
     this.child = null;
     this.currentGameId = null;
     this.stdout = '';
@@ -254,13 +283,13 @@ export class UciEngineClient {
       const startup = this.startup;
       this.startup = null;
       clearTimeout(startup.timer);
-      startup.reject(error);
+      startup.reject(failure);
     }
     this.startupPromise = null;
 
     const search = this.currentSearch;
     if (search) {
-      this.finishSearch(search, false, search.abortReason ?? error);
+      this.finishSearch(search, false, search.abortReason ?? failure);
     }
   }
 }

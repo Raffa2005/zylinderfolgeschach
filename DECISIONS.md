@@ -614,3 +614,13 @@ and their consequences, not the code line by line.
     an unreduced search at one evaluator-dependent start position falsely treats
     a selective heuristic as exact. Shallow alpha-beta remains compared against
     exhaustive minimax where exact equality is a valid contract.
+
+75. **Engine-process recovery is bounded and the local viewer is supervised.**
+    If the native UCI child exits unexpectedly, the client starts a fresh child
+    and replays that search once with the full root position and move history.
+    Explicit cancellation is never retried, and a second process failure is
+    returned to the browser rather than creating an infinite restart loop. The
+    integration test kills a real Kugelfisch process during search and requires
+    the replay to return a legal move. On the development machine the Node
+    viewer is an enabled user service with whole-service automatic restart, so
+    it no longer depends on a Codex terminal session remaining attached.

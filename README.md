@@ -177,8 +177,11 @@ python3 tools/export_selfplay_gallery.py run.jsonl \
 The server keeps one UCI process alive and allows only one search at a time.
 Each browser game gets a session identifier: `ucinewgame` clears the TT at the
 session boundary, while later moves in that game retain useful TT entries. The
-engine still has exactly one CPU-intensive search worker; Node and the UCI
-controller only handle I/O and cancellation.
+engine client restarts and replays a search once after an unexpected native
+process failure; cancellation is never retried, and a repeatedly failing engine
+is reported instead of looped forever. The engine still has exactly one
+CPU-intensive search worker; Node and the UCI controller only handle I/O and
+cancellation.
 
 `npm run play` rebuilds the UI around the committed WebAssembly payload.
 `npm run dev` also recompiles that payload and therefore requires Emscripten

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseInfoLine } from '../viewer/scripts/engine-client.mjs';
+import {
+  parseInfoLine,
+  UciEngineClient,
+} from '../viewer/scripts/engine-client.mjs';
 import {
   DEFAULT_ENGINE_DEPTH,
   startViewerServer,
@@ -28,6 +31,27 @@ assert.deepEqual(
   },
 );
 assert.equal(parseInfoLine('id name Kugelfisch'), null);
+
+const recoveringEngine = new UciEngineClient(enginePath);
+let killedEngine = false;
+try {
+  const recovered = await recoveringEngine.search({
+    gameId: 'process-recovery',
+    rootFen:
+      'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -',
+    moves: [],
+    depth: 8,
+    onInfo: () => {
+      if (killedEngine) return;
+      killedEngine = true;
+      recoveringEngine.child.kill('SIGKILL');
+    },
+  });
+  assert.equal(killedEngine, true);
+  assert.match(recovered.move, /^[a-h][1-8][a-h][1-8][qrbn]?$/);
+} finally {
+  await recoveringEngine.close();
+}
 
 const testsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const service = await startViewerServer({
