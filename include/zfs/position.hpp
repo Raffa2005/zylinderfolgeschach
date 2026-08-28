@@ -30,6 +30,14 @@ struct Undo {
     std::uint64_t key = 0;
 };
 
+struct NullUndo {
+    Square en_passant = kNoSquare;
+    Square follow = kNoSquare;
+    std::uint16_t halfmove_clock = 0;
+    std::uint32_t fullmove_number = 1;
+    std::uint64_t key = 0;
+};
+
 class Position {
 public:
     Position(const Position&) noexcept = default;
@@ -85,6 +93,10 @@ public:
     // a move produced by generate_legal_moves().
     void do_move(Move move, Undo& undo) noexcept;
     void undo_move(Move move, const Undo& undo) noexcept;
+
+    // Search-only synthetic pass. This is never a legal ZFS move.
+    void do_null_move(NullUndo& undo) noexcept;
+    void undo_null_move(const NullUndo& undo) noexcept;
 
 private:
     Position() noexcept = default;

@@ -408,6 +408,34 @@ void test_make_unmake_and_playouts() {
     }
 }
 
+void test_null_make_unmake() {
+    auto position = load(
+        "4k3/8/8/p6P/8/8/8/4K3 w - a6 0 2 a7");
+    const std::string before = position.to_fen();
+    const std::uint64_t key = position.raw_key();
+    const auto rights = position.castling_rights();
+    const auto clock = position.halfmove_clock();
+    const auto fullmove = position.fullmove_number();
+    const auto occupied = position.occupied();
+
+    zfs::NullUndo undo;
+    position.do_null_move(undo);
+    CHECK(position.side_to_move() == zfs::Color::Black);
+    CHECK(position.en_passant_square() == zfs::kNoSquare);
+    CHECK(position.follow_square() == zfs::kNoSquare);
+    CHECK(position.castling_rights() == rights);
+    CHECK(position.halfmove_clock() == clock + 1U);
+    CHECK(position.fullmove_number() == fullmove);
+    CHECK(position.occupied() == occupied);
+    CHECK(position.raw_key() != key);
+    CHECK(position.validate().empty());
+
+    position.undo_null_move(undo);
+    CHECK(position.to_fen() == before);
+    CHECK(position.raw_key() == key);
+    CHECK(position.validate().empty());
+}
+
 void test_terminal_states() {
     auto mate = load("8/8/8/8/8/K7/8/k1Q5 b - - 0 1 -");
     CHECK(mate.in_check(zfs::Color::Black));
@@ -427,6 +455,7 @@ int main() {
     test_follow_legality();
     test_special_moves();
     test_make_unmake_and_playouts();
+    test_null_make_unmake();
     test_terminal_states();
 
     if (failures != 0) {

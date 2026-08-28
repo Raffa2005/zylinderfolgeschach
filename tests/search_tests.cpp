@@ -233,6 +233,37 @@ void test_search_path_twofold() {
     CHECK(result.score == 0);
 }
 
+void test_null_move_pruning_is_exercised_and_guarded() {
+    zfs::engine::TranspositionTable table(4);
+    zfs::engine::Searcher searcher(table);
+    zfs::engine::SearchLimits limits;
+    limits.depth = 7;
+    limits.quiescence_plies = 0;
+    const std::atomic_bool stop{false};
+    const auto exercised = searcher.search(zfs::Game{}, limits, {}, stop);
+    CHECK(exercised.has_move);
+    CHECK(exercised.null_searches > 0);
+    CHECK(exercised.null_verifications > 0);
+    CHECK(exercised.null_cutoffs > 0);
+    CHECK(exercised.null_cutoffs <= exercised.null_verifications);
+    CHECK(exercised.null_verifications <= exercised.null_searches);
+
+    auto old_clock = load(
+        "4k3/8/8/8/8/8/8/R3K3 w - - 91 46 -");
+    const auto guarded = searcher.search(zfs::Game(old_clock), limits, {}, stop);
+    CHECK(guarded.has_move);
+    CHECK(guarded.null_searches == 0);
+
+    limits.nodes = 100;
+    const auto aborted = searcher.search(zfs::Game{}, limits, {}, stop);
+    CHECK(aborted.has_move);
+    limits.nodes = 0;
+    limits.depth = 2;
+    const auto after_abort = searcher.search(zfs::Game{}, limits, {}, stop);
+    CHECK(after_abort.has_move);
+    CHECK(after_abort.depth == 2);
+}
+
 void test_against_exhaustive_minimax() {
     compare_with_reference(
         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -",
@@ -250,6 +281,7 @@ int main() {
     test_limits_and_determinism();
     test_limit_normalization_and_tt_epoch();
     test_search_path_twofold();
+    test_null_move_pruning_is_exercised_and_guarded();
     test_against_exhaustive_minimax();
     if (failures != 0) {
         std::cerr << failures << " search assertion(s) failed\n";

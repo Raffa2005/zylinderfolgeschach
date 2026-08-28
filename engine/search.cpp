@@ -22,6 +22,8 @@ constexpr int kInfinity = 32000;
 constexpr int kMaximumPly = 128;
 constexpr int kMaximumQuiescencePlies = 8;
 constexpr int kStopCheckMask = 1023;
+constexpr std::uint64_t kNullContext = 0x452821e638d01377ULL;
+constexpr std::uint64_t kSyntheticScoreDomain = 0xbe5466cf34e90c6cULL;
 
 [[nodiscard]] constexpr std::uint64_t mix64(std::uint64_t value) noexcept {
     value ^= value >> 30U;
@@ -323,12 +325,14 @@ private:
         return context;
     }
 
-    [[nodiscard]] std::uint64_t score_key(int ply) const noexcept {
+    [[nodiscard]] std::uint64_t score_key(int ply,
+                                          bool synthetic_path) const noexcept {
         const std::uint64_t clock = mix64(
             static_cast<std::uint64_t>(position_.halfmove_clock()) ^
             0xa4093822299f31d0ULL);
         return position_.raw_key() ^
-               std::rotl(buffers_->context_keys[ply], 17) ^ clock;
+               std::rotl(buffers_->context_keys[ply], 17) ^ clock ^
+               (synthetic_path ? kSyntheticScoreDomain : 0ULL);
     }
 
     void make_move(Move move, int ply) noexcept {
@@ -350,6 +354,13 @@ private:
     void undo_move(int ply) noexcept {
         const Buffers::Transition& transition = buffers_->transitions[ply];
         position_.undo_move(transition.move, transition.undo);
+    }
+
+    void make_null_move(int ply, NullUndo& undo) noexcept {
+        position_.do_null_move(undo);
+        buffers_->base_keys[ply + 1] = position_.base_key();
+        buffers_->context_keys[ply + 1] =
+            mix64(position_.raw_key() ^ kNullContext);
     }
 
     [[nodiscard]] unsigned root_repetitions() const {
@@ -479,7 +490,15 @@ private:
         value = std::min(100'000, value + depth * depth);
     }
 
-    [[nodiscard]] int quiescence(int alpha, int beta, int ply, int qply) {
+    [[nodiscard]] bool has_non_pawn_material() const noexcept {
+        const Color side = position_.side_to_move();
+        const Bitboard pawns = position_.pieces(side, PieceType::Pawn);
+        const Bitboard king = position_.pieces(side, PieceType::King);
+        return (position_.occupied(side) & ~(pawns | king)) != 0;
+    }
+
+    [[nodiscard]] int quiescence(int alpha, int beta, int ply, int qply,
+                                 bool synthetic_path) {
         if (!visit_node(ply)) {
             return 0;
         }
@@ -488,7 +507,7 @@ private:
             return evaluate_material(position_);
         }
 
-        if (is_search_repetition(ply)) {
+        if (!synthetic_path && is_search_repetition(ply)) {
             return 0;
         }
 
@@ -538,7 +557,8 @@ private:
             pick_next(moves, index, search_count, ply);
             const Move move = moves[index];
             make_move(move, ply);
-            const int score = -quiescence(-beta, -alpha, ply + 1, qply + 1);
+            const int score = -quiescence(-beta, -alpha, ply + 1, qply + 1,
+                                          synthetic_path);
             undo_move(ply);
             if (aborted_) {
                 return 0;
@@ -557,9 +577,10 @@ private:
         return best;
     }
 
-    [[nodiscard]] int alpha_beta(int depth, int alpha, int beta, int ply) {
+    [[nodiscard]] int alpha_beta(int depth, int alpha, int beta, int ply,
+                                 bool allow_null, bool synthetic_path) {
         if (depth <= 0) {
-            return quiescence(alpha, beta, ply, 0);
+            return quiescence(alpha, beta, ply, 0, synthetic_path);
         }
         if (!visit_node(ply)) {
             return 0;
@@ -569,7 +590,7 @@ private:
             return evaluate_material(position_);
         }
 
-        if (is_search_repetition(ply)) {
+        if (!synthetic_path && is_search_repetition(ply)) {
             return 0;
         }
 
@@ -580,7 +601,7 @@ private:
         }
         const int original_alpha = alpha;
 
-        const std::uint64_t key = score_key(ply);
+        const std::uint64_t key = score_key(ply, synthetic_path);
         const TTData tt = table_.probe(key);
         Move tt_move{};
         if (tt.hit) {
@@ -606,6 +627,42 @@ private:
             return 0;
         }
 
+        const bool null_window = beta == alpha + 1;
+        if (limits_.null_move_pruning && allow_null && null_window && depth >= 5 &&
+            position_.halfmove_clock() <= 90U && beta > -kMateThreshold &&
+            beta < kMateThreshold && has_non_pawn_material() &&
+            !position_.in_check(position_.side_to_move()) &&
+            !(valid_square(position_.follow_square()) &&
+              moves[0].to() == position_.follow_square()) &&
+            evaluate_material(position_) >= beta) {
+            const int reduction = 2 + depth / 5;
+            NullUndo undo;
+            make_null_move(ply, undo);
+            ++null_searches_;
+            const int null_score = -alpha_beta(
+                depth - 1 - reduction, -beta, -beta + 1, ply + 1, false, true);
+            position_.undo_null_move(undo);
+            if (aborted_) {
+                return 0;
+            }
+            if (null_score >= beta) {
+                // Verification is deliberately mandatory in ZFS: even an
+                // unrestricted position can be a follow-origin zugzwang.
+                ++null_verifications_;
+                const int verified = alpha_beta(
+                    depth - reduction, alpha, beta, ply, false, synthetic_path);
+                if (aborted_) {
+                    return 0;
+                }
+                buffers_->pv_length[ply] = 0;
+                if (verified >= beta) {
+                    ++null_cutoffs_;
+                    return beta;
+                }
+                position_.generate_legal_moves(moves);
+            }
+        }
+
         score_moves(moves, moves.size(), tt_move, ply);
         int best = -kInfinity;
         Move best_move{};
@@ -616,11 +673,14 @@ private:
             make_move(move, ply);
             int score;
             if (first_move) {
-                score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1);
+                score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1, true,
+                                    synthetic_path);
             } else {
-                score = -alpha_beta(depth - 1, -alpha - 1, -alpha, ply + 1);
+                score = -alpha_beta(depth - 1, -alpha - 1, -alpha, ply + 1,
+                                    true, synthetic_path);
                 if (!aborted_ && score > alpha && score < beta) {
-                    score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1);
+                    score = -alpha_beta(depth - 1, -beta, -alpha, ply + 1,
+                                        true, synthetic_path);
                 }
             }
             undo_move(ply);
@@ -671,11 +731,14 @@ private:
             make_move(move, 0);
             int child;
             if (index == 0) {
-                child = -alpha_beta(depth - 1, -kInfinity, kInfinity, 1);
+                child = -alpha_beta(depth - 1, -kInfinity, kInfinity, 1, true,
+                                    false);
             } else {
-                child = -alpha_beta(depth - 1, -alpha - 1, -alpha, 1);
+                child = -alpha_beta(depth - 1, -alpha - 1, -alpha, 1, true,
+                                    false);
                 if (!aborted_ && child > alpha) {
-                    child = -alpha_beta(depth - 1, -kInfinity, -alpha, 1);
+                    child = -alpha_beta(depth - 1, -kInfinity, -alpha, 1, true,
+                                        false);
                 }
             }
             undo_move(0);
@@ -700,7 +763,7 @@ private:
 
         best_move = root_moves_[best_index].move;
         score = best;
-        const std::uint64_t key = score_key(0);
+        const std::uint64_t key = score_key(0, false);
         table_.store(key, best_move, score_to_table(best, 0), depth,
                      Bound::Exact);
         return true;
@@ -709,6 +772,9 @@ private:
     void finish_result() noexcept {
         result_.nodes = nodes_;
         result_.elapsed_ms = elapsed_ms();
+        result_.null_searches = null_searches_;
+        result_.null_verifications = null_verifications_;
+        result_.null_cutoffs = null_cutoffs_;
         result_.selective_depth = std::max(result_.selective_depth,
                                             selective_depth_);
     }
@@ -729,6 +795,9 @@ private:
     std::int64_t hard_budget_ms_ = 0;
     std::int64_t soft_budget_ms_ = 0;
     std::uint64_t nodes_ = 0;
+    std::uint64_t null_searches_ = 0;
+    std::uint64_t null_verifications_ = 0;
+    std::uint64_t null_cutoffs_ = 0;
     int selective_depth_ = 0;
     bool has_deadline_ = false;
     bool has_time_budget_ = false;

@@ -29,6 +29,7 @@ struct SearchLimits {
     std::int64_t move_overhead_ms = 10;
     bool infinite = false;
     bool ponder = false;
+    bool null_move_pruning = true;
     bool restrict_search_moves = false;
     std::vector<Move> search_moves;
 };
@@ -51,6 +52,9 @@ struct SearchResult {
     int selective_depth = 0;
     std::uint64_t nodes = 0;
     std::int64_t elapsed_ms = 0;
+    std::uint64_t null_searches = 0;
+    std::uint64_t null_verifications = 0;
+    std::uint64_t null_cutoffs = 0;
     std::vector<Move> principal_variation;
 };
 

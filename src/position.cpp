@@ -860,6 +860,41 @@ void Position::undo_move(Move move, const Undo& undo) noexcept {
     key_ = undo.key;
 }
 
+void Position::do_null_move(NullUndo& undo) noexcept {
+    undo.en_passant = en_passant_;
+    undo.follow = follow_;
+    undo.halfmove_clock = halfmove_clock_;
+    undo.fullmove_number = fullmove_number_;
+    undo.key = key_;
+
+    if (valid_square(en_passant_)) {
+        key_ ^= detail::kZobrist.en_passant[en_passant_];
+    }
+    if (valid_square(follow_)) {
+        key_ ^= detail::kZobrist.follow[follow_];
+    }
+    en_passant_ = kNoSquare;
+    follow_ = kNoSquare;
+    if (halfmove_clock_ != std::numeric_limits<std::uint16_t>::max()) {
+        ++halfmove_clock_;
+    }
+    if (side_to_move_ == Color::Black &&
+        fullmove_number_ != std::numeric_limits<std::uint32_t>::max()) {
+        ++fullmove_number_;
+    }
+    side_to_move_ = opposite(side_to_move_);
+    key_ ^= detail::kZobrist.black_to_move;
+}
+
+void Position::undo_null_move(const NullUndo& undo) noexcept {
+    side_to_move_ = opposite(side_to_move_);
+    en_passant_ = undo.en_passant;
+    follow_ = undo.follow;
+    halfmove_clock_ = undo.halfmove_clock;
+    fullmove_number_ = undo.fullmove_number;
+    key_ = undo.key;
+}
+
 std::optional<Position> Position::from_fen(std::string_view fen,
                                            std::string* error) {
     const auto fields = split_fields(fen);
