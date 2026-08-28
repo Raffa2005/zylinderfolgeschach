@@ -62,6 +62,37 @@ std::vector<std::string> moves_from(zfs::Position& position,
     return result;
 }
 
+void check_tactical_moves(zfs::Position& position) {
+    zfs::MoveList legal;
+    position.generate_legal_moves(legal);
+    const bool checked = position.in_check(position.side_to_move());
+    const bool follow_forced =
+        zfs::valid_square(position.follow_square()) && !legal.empty() &&
+        std::ranges::all_of(legal, [&](zfs::Move move) {
+            return move.to() == position.follow_square();
+        });
+
+    zfs::MoveList tactical;
+    const zfs::TacticalMoveInfo info =
+        position.generate_legal_tactical_moves(tactical);
+    CHECK(info.has_legal_moves == !legal.empty());
+    CHECK(info.in_check == checked);
+    CHECK(info.all_moves_required == (checked || follow_forced));
+
+    std::set<std::string> expected;
+    for (zfs::Move move : legal) {
+        if (info.all_moves_required || move.is_capture() || move.is_promotion()) {
+            expected.insert(move.uci());
+        }
+    }
+    std::set<std::string> actual;
+    for (zfs::Move move : tactical) {
+        actual.insert(move.uci());
+    }
+    CHECK(actual.size() == tactical.size());
+    CHECK(actual == expected);
+}
+
 std::uint64_t perft(zfs::Position& position, unsigned depth) {
     zfs::MoveList moves;
     position.generate_legal_moves(moves);
@@ -392,6 +423,7 @@ void test_make_unmake_and_playouts() {
 
     std::uint64_t random = 0x4d595df4d0f33173ULL;
     for (unsigned ply = 0; ply < 1000; ++ply) {
+        check_tactical_moves(position);
         zfs::MoveList moves;
         position.generate_legal_moves(moves);
         if (moves.empty()) {
@@ -409,6 +441,22 @@ void test_make_unmake_and_playouts() {
         position.undo_move(move, undo);
         CHECK(position.to_fen() == before);
         position.do_move(move, undo);
+    }
+}
+
+void test_tactical_move_generation() {
+    constexpr std::array positions{
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 -",
+        "7k/8/8/8/8/8/8/R3K3 w - - 0 1 a3",
+        "1k2r3/8/8/8/8/8/R7/4K3 w - - 0 1 c2",
+        "4k3/8/8/p6P/8/8/8/4K3 w - a6 0 2 a7",
+        "1k6/7P/8/8/8/8/8/4K3 w - - 0 1 h8",
+        "8/8/8/8/8/K7/8/k1Q5 b - - 0 1 -",
+        "8/8/8/8/8/8/4Q3/K1k5 b - - 0 1 -",
+    };
+    for (std::string_view fen : positions) {
+        auto position = load(fen);
+        check_tactical_moves(position);
     }
 }
 
@@ -459,6 +507,7 @@ int main() {
     test_follow_legality();
     test_special_moves();
     test_make_unmake_and_playouts();
+    test_tactical_move_generation();
     test_null_make_unmake();
     test_terminal_states();
 

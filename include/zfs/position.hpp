@@ -20,6 +20,12 @@ enum CastlingRight : std::uint8_t {
 
 enum class TerminalState : std::uint8_t { Ongoing, Checkmate, Stalemate };
 
+struct TacticalMoveInfo {
+    bool has_legal_moves = false;
+    bool in_check = false;
+    bool all_moves_required = false;
+};
+
 struct Undo {
     Piece captured = Piece::None;
     std::uint8_t castling_rights = 0;
@@ -85,6 +91,7 @@ public:
     [[nodiscard]] bool must_follow();
 
     void generate_legal_moves(MoveList& result);
+    [[nodiscard]] TacticalMoveInfo generate_legal_tactical_moves(MoveList& result);
     [[nodiscard]] MoveList legal_moves();
     [[nodiscard]] std::optional<Move> parse_uci(std::string_view uci);
     [[nodiscard]] bool is_legal(Move move);
@@ -100,6 +107,11 @@ public:
     void undo_null_move(const NullUndo& undo) noexcept;
 
 private:
+    struct LegalContext {
+        bool checked = false;
+        Bitboard king_blockers = 0;
+    };
+
     Position() noexcept = default;
 
     template <bool UpdateKey>
@@ -119,11 +131,18 @@ private:
     [[nodiscard]] bool castle_transit_safe(Color color, Square transit) noexcept;
     [[nodiscard]] bool move_lands_on(Move move, Square target) const noexcept;
     [[nodiscard]] bool leaves_king_safe(Move move) noexcept;
+    [[nodiscard]] LegalContext legal_context() const noexcept;
+    [[nodiscard]] bool legal_with_context(Move move,
+                                          const LegalContext& context) noexcept;
 
     void generate_pseudo_legal(MoveList& result) noexcept;
+    void generate_pseudo_tactical(MoveList& result) noexcept;
     void generate_pseudo_to(MoveList& result, Square target) noexcept;
     void generate_pawn_moves(MoveList& result, Color color) noexcept;
+    void generate_pawn_tactical(MoveList& result, Color color) noexcept;
     void generate_piece_moves(MoveList& result, Color color, PieceType type) noexcept;
+    void generate_piece_captures(MoveList& result, Color color,
+                                 PieceType type) noexcept;
     void generate_castles(MoveList& result, Color color) noexcept;
     [[nodiscard]] std::uint64_t non_piece_key() const noexcept;
 

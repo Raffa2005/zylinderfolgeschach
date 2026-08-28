@@ -13,6 +13,7 @@ The JSONL ledger is authoritative.
 | `history-malus-1x` | rejected | 5,488,808 | 1,850 ms | 64 |
 | `lmr-r1-zfs-guarded` | rejected | 4,049,790 | 1,409 ms | 64 |
 | `lmr-r1-late7-d5` | accepted | 4,201,814 | 1,448 ms | 128 |
+| `qsearch-exact-tactical-gen` | accepted | 4,201,814 | 1,112 ms | 128 |
 
 ## `null-verified-r2`: rejected
 
@@ -88,3 +89,37 @@ and blind review found no correctness or hot-path blocker. The boolean
 compulsory-follow guard deliberately keeps a small amount of move-generation
 duplication so it can return after the first legal follow instead of building a
 complete move list.
+
+## Champion #2 cumulative checkpoint
+
+The frozen null-move-plus-LMR champion was measured directly against ZFS-0;
+experiment point estimates are not added together. Over 64 pairs at 30 ms it
+scored 51.95%, or +13.58 Elo point with a wide 95% interval of
+[-11.93, +39.23]. At fixed depth nine, its tree was 63.22% smaller and its
+median wall time 57.78% lower than ZFS-0. The strength interval remained
+inconclusive, while the search-capacity improvement was deterministic.
+
+## Exact quiescence tactical generation: accepted
+
+Quiescence previously generated the complete legal move list and then discarded
+ordinary quiet moves. The replacement is an exact subset generator:
+
+- an active follow emits every legal follower;
+- check emits every legal evasion;
+- otherwise it emits captures and all promotions, including quiet promotions;
+- when that subset is empty, it scans quiet legality only until it can
+  distinguish an ordinary quiet position from stalemate.
+
+It uses the same king-safety context as full legal generation. Differential
+tests compare both APIs through 1,000 deterministic plies and focused forced
+follow, inactive-follow, check, seam en-passant, promotion, mate, and stalemate
+positions. Full Release and ASan/UBSan suites pass, and adversarial review found
+no semantic or hot-path blocker.
+
+Fixed-depth behavior is identical: both champion #2 and the candidate search
+4,201,814 depth-9 nodes with signature `8559bb05119cc631`. Median time fell from
+1,446 ms to 1,112 ms (-23.10%). Two independent 32-pair, 30 ms screens scored
+50.78% (+5.43 Elo point) and 51.56% (+10.86 Elo point). Neither crossed a
+sequential boundary; promotion rests primarily on the exact semantic oracle and
+repeatable throughput gain, with self-play providing a compatible positive
+signal.

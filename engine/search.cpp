@@ -512,11 +512,10 @@ private:
         }
 
         MoveList& moves = buffers_->moves[ply];
-        position_.generate_legal_moves(moves);
-        if (moves.empty()) {
-            return position_.in_check(position_.side_to_move())
-                       ? -kMateScore + ply
-                       : 0;
+        const TacticalMoveInfo move_info =
+            position_.generate_legal_tactical_moves(moves);
+        if (!move_info.has_legal_moves) {
+            return move_info.in_check ? -kMateScore + ply : 0;
         }
         if (position_.halfmove_clock() >= 100U) {
             return 0;
@@ -527,11 +526,8 @@ private:
             return evaluate_material(position_);
         }
 
-        const bool in_check = position_.in_check(position_.side_to_move());
-        const bool follow_forced = valid_square(position_.follow_square()) &&
-                                   moves[0].to() == position_.follow_square();
         int best = -kInfinity;
-        if (!in_check && !follow_forced) {
+        if (!move_info.all_moves_required) {
             best = evaluate_material(position_);
             if (best >= beta) {
                 return best;
@@ -539,17 +535,9 @@ private:
             alpha = std::max(alpha, best);
         }
 
-        std::size_t search_count = moves.size();
-        if (!in_check && !follow_forced) {
-            search_count = 0;
-            for (std::size_t index = 0; index < moves.size(); ++index) {
-                if (moves[index].is_capture() || moves[index].is_promotion()) {
-                    moves[search_count++] = moves[index];
-                }
-            }
-            if (search_count == 0) {
-                return best;
-            }
+        const std::size_t search_count = moves.size();
+        if (search_count == 0) {
+            return best;
         }
 
         score_moves(moves, search_count, Move{}, ply);

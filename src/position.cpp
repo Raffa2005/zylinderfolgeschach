@@ -371,6 +371,54 @@ void Position::generate_pawn_moves(MoveList& result, Color color) noexcept {
     }
 }
 
+void Position::generate_pawn_tactical(MoveList& result, Color color) noexcept {
+    const unsigned us = color_index(color);
+    const unsigned them = color_index(opposite(color));
+    const int step = color == Color::White ? 8 : -8;
+    const unsigned promotion_rank = color == Color::White ? 7U : 0U;
+    const Bitboard enemy_king = pieces_[them][type_index(PieceType::King)];
+    Bitboard pawns = pieces_[us][type_index(PieceType::Pawn)];
+
+    while (pawns != 0) {
+        const Square from = pop_lsb(pawns);
+        const int destination = static_cast<int>(from) + step;
+        if (destination >= 0 && destination < 64) {
+            const auto to = static_cast<Square>(destination);
+            if (rank_of(to) == promotion_rank && board_[to] == Piece::None) {
+                for (PieceType promotion : {PieceType::Knight, PieceType::Bishop,
+                                            PieceType::Rook, PieceType::Queen}) {
+                    result.push(Move(from, to, MoveType::Promotion, promotion));
+                }
+            }
+        }
+
+        Bitboard captures = detail::kAttacks.pawn[us][from] & colors_[them] &
+                            ~enemy_king;
+        while (captures != 0) {
+            const Square to = pop_lsb(captures);
+            if (rank_of(to) == promotion_rank) {
+                for (PieceType promotion : {PieceType::Knight, PieceType::Bishop,
+                                            PieceType::Rook, PieceType::Queen}) {
+                    result.push(
+                        Move(from, to, MoveType::PromotionCapture, promotion));
+                }
+            } else {
+                result.push(Move(from, to, MoveType::Capture));
+            }
+        }
+
+        if (valid_square(en_passant_) &&
+            (detail::kAttacks.pawn[us][from] & square_bb(en_passant_)) != 0) {
+            const auto captured =
+                static_cast<Square>(static_cast<int>(en_passant_) - step);
+            if (board_[en_passant_] == Piece::None &&
+                board_[captured] == make_piece(opposite(color), PieceType::Pawn)) {
+                result.push(Move(from, en_passant_, MoveType::EnPassant));
+            }
+        }
+    }
+}
+
 void Position::generate_piece_moves(MoveList& result, Color color,
                                     PieceType type) noexcept {
     const unsigned us = color_index(color);
@@ -398,6 +446,33 @@ void Position::generate_piece_moves(MoveList& result, Color color,
                                            ? MoveType::Capture
                                            : MoveType::Quiet;
             result.push(Move(from, to, move_type));
+        }
+    }
+}
+
+void Position::generate_piece_captures(MoveList& result, Color color,
+                                       PieceType type) noexcept {
+    const unsigned us = color_index(color);
+    const unsigned them = color_index(opposite(color));
+    const Bitboard targets_allowed =
+        colors_[them] & ~pieces_[them][type_index(PieceType::King)];
+    Bitboard pieces = pieces_[us][type_index(type)];
+    while (pieces != 0) {
+        const Square from = pop_lsb(pieces);
+        Bitboard targets = 0;
+        switch (type) {
+            case PieceType::Knight: targets = detail::kAttacks.knight[from]; break;
+            case PieceType::Bishop: targets = bishop_attacks(from); break;
+            case PieceType::Rook: targets = rook_attacks(from); break;
+            case PieceType::Queen:
+                targets = bishop_attacks(from) | rook_attacks(from);
+                break;
+            case PieceType::King: targets = detail::kAttacks.king[from]; break;
+            default: break;
+        }
+        targets &= targets_allowed;
+        while (targets != 0) {
+            result.push(Move(from, pop_lsb(targets), MoveType::Capture));
         }
     }
 }
@@ -458,6 +533,17 @@ void Position::generate_pseudo_legal(MoveList& result) noexcept {
     generate_piece_moves(result, color, PieceType::Queen);
     generate_piece_moves(result, color, PieceType::King);
     generate_castles(result, color);
+}
+
+void Position::generate_pseudo_tactical(MoveList& result) noexcept {
+    result.clear();
+    const Color color = side_to_move_;
+    generate_pawn_tactical(result, color);
+    generate_piece_captures(result, color, PieceType::Knight);
+    generate_piece_captures(result, color, PieceType::Bishop);
+    generate_piece_captures(result, color, PieceType::Rook);
+    generate_piece_captures(result, color, PieceType::Queen);
+    generate_piece_captures(result, color, PieceType::King);
 }
 
 void Position::generate_pseudo_to(MoveList& result, Square target) noexcept {
@@ -574,6 +660,58 @@ bool Position::leaves_king_safe(Move move) noexcept {
     return safe;
 }
 
+Position::LegalContext Position::legal_context() const noexcept {
+    const Color mover = side_to_move_;
+    const unsigned us = color_index(mover);
+    const unsigned them = color_index(opposite(mover));
+    const Square king = king_square(mover);
+    assert(valid_square(king));
+    const Bitboard diagonal = bishop_attacks(king);
+    const Bitboard orthogonal = rook_attacks(king);
+    const Bitboard diagonal_sliders =
+        pieces_[them][type_index(PieceType::Bishop)] |
+        pieces_[them][type_index(PieceType::Queen)];
+    const Bitboard orthogonal_sliders =
+        pieces_[them][type_index(PieceType::Rook)] |
+        pieces_[them][type_index(PieceType::Queen)];
+
+    LegalContext context;
+    context.checked =
+        (detail::kAttacks.pawn[us][king] &
+         pieces_[them][type_index(PieceType::Pawn)]) != 0 ||
+        (detail::kAttacks.knight[king] &
+         pieces_[them][type_index(PieceType::Knight)]) != 0 ||
+        (detail::kAttacks.king[king] &
+         pieces_[them][type_index(PieceType::King)]) != 0 ||
+        (diagonal & diagonal_sliders) != 0 ||
+        (orthogonal & orthogonal_sliders) != 0;
+    if (context.checked) {
+        return context;
+    }
+
+    Bitboard possible = (diagonal | orthogonal) & colors_[us];
+    possible &= ~square_bb(king);
+    while (possible != 0) {
+        const Square blocker = pop_lsb(possible);
+        const Bitboard occupancy = occupied_ & ~square_bb(blocker);
+        if ((detail::bishop_attacks(king, occupancy) & diagonal_sliders) != 0 ||
+            (detail::rook_attacks(king, occupancy) & orthogonal_sliders) != 0) {
+            context.king_blockers |= square_bb(blocker);
+        }
+    }
+    return context;
+}
+
+bool Position::legal_with_context(Move move,
+                                  const LegalContext& context) noexcept {
+    const Piece moving = board_[move.from()];
+    const bool needs_exact_test =
+        context.checked || piece_type(moving) == PieceType::King ||
+        move.type() == MoveType::EnPassant ||
+        (context.king_blockers & square_bb(move.from())) != 0;
+    return !needs_exact_test || leaves_king_safe(move);
+}
+
 bool Position::must_follow() {
     if (!valid_square(follow_)) {
         return false;
@@ -625,55 +763,75 @@ void Position::generate_legal_moves(MoveList& result) {
         generate_pseudo_legal(candidates);
     }
 
-    const Color mover = side_to_move_;
-    const unsigned us = color_index(mover);
-    const unsigned them = color_index(opposite(mover));
-    const Square king = king_square(mover);
-    assert(valid_square(king));
-    const Bitboard diagonal = bishop_attacks(king);
-    const Bitboard orthogonal = rook_attacks(king);
-    const Bitboard diagonal_sliders =
-        pieces_[them][type_index(PieceType::Bishop)] |
-        pieces_[them][type_index(PieceType::Queen)];
-    const Bitboard orthogonal_sliders =
-        pieces_[them][type_index(PieceType::Rook)] |
-        pieces_[them][type_index(PieceType::Queen)];
-    const bool checked =
-        (detail::kAttacks.pawn[us][king] &
-         pieces_[them][type_index(PieceType::Pawn)]) != 0 ||
-        (detail::kAttacks.knight[king] &
-         pieces_[them][type_index(PieceType::Knight)]) != 0 ||
-        (detail::kAttacks.king[king] &
-         pieces_[them][type_index(PieceType::King)]) != 0 ||
-        (diagonal & diagonal_sliders) != 0 ||
-        (orthogonal & orthogonal_sliders) != 0;
-    Bitboard king_blockers = 0;
-    if (!checked) {
-        Bitboard possible = (diagonal | orthogonal) & colors_[us];
-        possible &= ~square_bb(king);
-        while (possible != 0) {
-            const Square blocker = pop_lsb(possible);
-            const Bitboard occupancy = occupied_ & ~square_bb(blocker);
-            if ((detail::bishop_attacks(king, occupancy) & diagonal_sliders) != 0 ||
-                (detail::rook_attacks(king, occupancy) & orthogonal_sliders) != 0) {
-                king_blockers |= square_bb(blocker);
-            }
-        }
-    }
-
+    const LegalContext context = legal_context();
     for (Move move : candidates) {
         if (has_follow && move_lands_on(move, follow_)) {
             continue;
         }
-        const Piece moving = board_[move.from()];
-        const bool needs_exact_test =
-            checked || piece_type(moving) == PieceType::King ||
-            move.type() == MoveType::EnPassant ||
-            (king_blockers & square_bb(move.from())) != 0;
-        if (!needs_exact_test || leaves_king_safe(move)) {
+        if (legal_with_context(move, context)) {
             result.push(move);
         }
     }
+}
+
+TacticalMoveInfo Position::generate_legal_tactical_moves(MoveList& result) {
+    result.clear();
+    MoveList candidates;
+    const bool has_follow = valid_square(follow_);
+    if (has_follow) {
+        generate_pseudo_to(candidates, follow_);
+        for (Move move : candidates) {
+            if (leaves_king_safe(move)) {
+                result.push(move);
+            }
+        }
+    }
+
+    const LegalContext context = legal_context();
+    if (!result.empty()) {
+        return TacticalMoveInfo{true, context.checked, true};
+    }
+
+    if (context.checked) {
+        generate_pseudo_legal(candidates);
+        for (Move move : candidates) {
+            if (has_follow && move_lands_on(move, follow_)) {
+                continue;
+            }
+            if (legal_with_context(move, context)) {
+                result.push(move);
+            }
+        }
+        return TacticalMoveInfo{!result.empty(), true, true};
+    }
+
+    generate_pseudo_tactical(candidates);
+    for (Move move : candidates) {
+        if (has_follow && move_lands_on(move, follow_)) {
+            continue;
+        }
+        if (legal_with_context(move, context)) {
+            result.push(move);
+        }
+    }
+    if (!result.empty()) {
+        return TacticalMoveInfo{true, false, false};
+    }
+
+    // No legal tactical move proves legality only if some quiet move survives.
+    // Stop at the first one: the caller needs the distinction between a quiet
+    // position and stalemate, not the quiet move list itself.
+    generate_pseudo_legal(candidates);
+    for (Move move : candidates) {
+        if (move.is_capture() || move.is_promotion() ||
+            (has_follow && move_lands_on(move, follow_))) {
+            continue;
+        }
+        if (legal_with_context(move, context)) {
+            return TacticalMoveInfo{true, false, false};
+        }
+    }
+    return TacticalMoveInfo{};
 }
 
 MoveList Position::legal_moves() {
