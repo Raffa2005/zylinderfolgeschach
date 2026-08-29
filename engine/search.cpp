@@ -24,6 +24,7 @@ constexpr int kMaximumQuiescencePlies = 8;
 constexpr int kStopCheckMask = 1023;
 constexpr std::uint64_t kNullContext = 0x452821e638d01377ULL;
 constexpr std::uint64_t kSyntheticScoreDomain = 0xbe5466cf34e90c6cULL;
+constexpr std::uint64_t kFullWidthScoreDomain = 0xd1b54a32d192ed03ULL;
 
 [[nodiscard]] constexpr std::uint64_t mix64(std::uint64_t value) noexcept {
     value ^= value >> 30U;
@@ -136,6 +137,7 @@ public:
         root_moves_.reserve(legal.size());
         const bool restrict_root = limits_.restrict_search_moves ||
                                    !limits_.search_moves.empty();
+        root_restricted_ = restrict_root;
         for (Move move : legal) {
             if (!restrict_root ||
                 std::find(limits_.search_moves.begin(), limits_.search_moves.end(),
@@ -171,6 +173,28 @@ public:
                 break;
             }
 
+            bool mate_proven = false;
+            if (std::abs(score) >= kMateThreshold && !external_stop() &&
+                !hard_limit_reached()) {
+                const int primary_score = score;
+                const Move primary_best = best;
+                const auto primary_pv = buffers_->pv[0];
+                const std::uint8_t primary_pv_length = buffers_->pv_length[0];
+                const std::uint64_t nodes_before = nodes_;
+                ++mate_verifications_;
+                const bool verification_completed =
+                    verify_full_width_root(depth, score, best);
+                mate_verification_nodes_ += nodes_ - nodes_before;
+                if (verification_completed) {
+                    mate_proven = std::abs(score) >= kMateThreshold;
+                } else {
+                    score = primary_score;
+                    best = primary_best;
+                    buffers_->pv[0] = primary_pv;
+                    buffers_->pv_length[0] = primary_pv_length;
+                }
+            }
+
             result_.best_move = best;
             result_.score = score;
             result_.depth = depth;
@@ -191,10 +215,9 @@ public:
             if (external_stop() || hard_limit_reached()) {
                 break;
             }
-            // A completed root iteration returns an exact score. Once it has
-            // proved mate, deeper iterations can only refine the distance; they
-            // cannot improve the game-theoretic result.
-            if (std::abs(score) >= kMateThreshold) {
+            // Selective search may report a mate that disappears at full
+            // width. Only the independently keyed verification is a proof.
+            if (mate_proven) {
                 break;
             }
         }
@@ -332,7 +355,8 @@ private:
             0xa4093822299f31d0ULL);
         return position_.raw_key() ^
                std::rotl(buffers_->context_keys[ply], 17) ^ clock ^
-               (synthetic_path ? kSyntheticScoreDomain : 0ULL);
+               (synthetic_path ? kSyntheticScoreDomain : 0ULL) ^
+               (full_width_verification_ ? kFullWidthScoreDomain : 0ULL);
     }
 
     void make_move(Move move, int ply) noexcept {
@@ -774,10 +798,26 @@ private:
 
         best_move = root_moves_[best_index].move;
         score = best;
-        const std::uint64_t key = score_key(0, false);
-        table_.store(key, best_move, score_to_table(best, 0), depth,
-                     Bound::Exact);
+        if (!root_restricted_) {
+            const std::uint64_t key = score_key(0, false);
+            table_.store(key, best_move, score_to_table(best, 0), depth,
+                         Bound::Exact);
+        }
         return true;
+    }
+
+    [[nodiscard]] bool verify_full_width_root(int depth, int& score,
+                                              Move& best_move) {
+        const bool saved_null = limits_.null_move_pruning;
+        const bool saved_lmr = limits_.late_move_reductions;
+        limits_.null_move_pruning = false;
+        limits_.late_move_reductions = false;
+        full_width_verification_ = true;
+        const bool completed = search_root(depth, score, best_move);
+        full_width_verification_ = false;
+        limits_.late_move_reductions = saved_lmr;
+        limits_.null_move_pruning = saved_null;
+        return completed;
     }
 
     void finish_result() noexcept {
@@ -788,6 +828,8 @@ private:
         result_.null_cutoffs = null_cutoffs_;
         result_.lmr_searches = lmr_searches_;
         result_.lmr_researches = lmr_researches_;
+        result_.mate_verifications = mate_verifications_;
+        result_.mate_verification_nodes = mate_verification_nodes_;
         result_.selective_depth = std::max(result_.selective_depth,
                                             selective_depth_);
     }
@@ -813,10 +855,14 @@ private:
     std::uint64_t null_cutoffs_ = 0;
     std::uint64_t lmr_searches_ = 0;
     std::uint64_t lmr_researches_ = 0;
+    std::uint64_t mate_verifications_ = 0;
+    std::uint64_t mate_verification_nodes_ = 0;
     int selective_depth_ = 0;
     bool has_deadline_ = false;
     bool has_time_budget_ = false;
     bool aborted_ = false;
+    bool full_width_verification_ = false;
+    bool root_restricted_ = false;
 };
 
 Searcher::Searcher(TranspositionTable& table) : table_(table) {}

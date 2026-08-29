@@ -58,6 +58,8 @@ struct SearchResult {
     std::uint64_t null_cutoffs = 0;
     std::uint64_t lmr_searches = 0;
     std::uint64_t lmr_researches = 0;
+    std::uint64_t mate_verifications = 0;
+    std::uint64_t mate_verification_nodes = 0;
     std::vector<Move> principal_variation;
 };
 

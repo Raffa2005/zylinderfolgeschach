@@ -259,3 +259,26 @@ Rejected branches were removed completely:
 Consequently, 30 ms is retained only as a cheap rejection screen for evaluator
 ideas. Promotion requires independent 100 ms evidence, while fixed-depth work
 and time remain separately reported so evaluation quality cannot hide its cost.
+
+## Cycle-three correctness baseline
+
+The cycle began by auditing the existing mate early-return before testing new
+heuristics. That audit found two baseline correctness defects, so the planned
+aspiration experiment was deferred and no strength result was attributed to it.
+
+First, the engine had treated a selective root mate score as a proof even when
+null-move pruning or late-move reductions occurred below the root. Mate claims
+now receive an independently keyed full-width verification with both heuristics
+disabled. Second, a restricted `go searchmoves` root had stored its partial-root
+score as an ordinary exact TT entry. A retained-table reproduction changed the
+unrestricted start-position depth-five result from the fresh result; suppressing
+only that restricted-root store makes the retained and fresh best move and score
+agree.
+
+The corrected baseline passes all 11 Release tests and the full ASan/UBSan
+suite. Its depth-nine corpus is deterministic at 2,049,525 nodes with signature
+`46538be04f62ccdb`; the previous shortcut searched 1,806,539 nodes. Interleaved
+four-run medians were 540.5 ms and 457 ms respectively. The +13.45% node and
++18.27% time cost is accepted as a correctness repair. A deterministic
+node-limit regression also proves that an interrupted verifier reports its work
+and preserves the last completed primary result.

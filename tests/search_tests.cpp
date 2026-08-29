@@ -113,6 +113,26 @@ void test_mate_and_material() {
     CHECK(mate.best_move.uci() == "c2c1");
     CHECK(mate.score >= zfs::engine::kMateThreshold);
     CHECK(mate.depth == 1);
+    CHECK(mate.mate_verifications == 1);
+    CHECK(mate.mate_verification_nodes > 0);
+
+    zfs::engine::TranspositionTable limited_table(1);
+    zfs::engine::Searcher limited_searcher(limited_table);
+    zfs::engine::SearchLimits limited_limits;
+    limited_limits.depth = 10;
+    limited_limits.nodes =
+        mate.nodes - mate.mate_verification_nodes + 1U;
+    const std::atomic_bool stop{false};
+    const auto limited = limited_searcher.search(
+        zfs::Game(load("8/8/8/8/8/K7/2Q5/k7 w - - 0 1 -")),
+        limited_limits, {}, stop);
+    CHECK(limited.has_move);
+    CHECK(limited.best_move == mate.best_move);
+    CHECK(limited.score == mate.score);
+    CHECK(limited.depth == 1);
+    CHECK(limited.nodes == limited_limits.nodes);
+    CHECK(limited.mate_verifications == 1);
+    CHECK(limited.mate_verification_nodes == 1U);
 
     const auto capture = search(
         zfs::Game(load("4k3/8/8/8/8/8/r7/R3K3 w - - 0 1 -")), 1);
@@ -251,6 +271,39 @@ void test_limits_and_determinism() {
     CHECK(first.principal_variation == second.principal_variation);
 }
 
+void test_restricted_root_does_not_pollute_transposition_table() {
+    zfs::Game advanced;
+    CHECK(advanced.play_uci("g1f3").has_value());
+    zfs::Position advanced_root = advanced.position();
+    const auto restricted_move = advanced_root.parse_uci("a7a6");
+    CHECK(restricted_move.has_value());
+
+    zfs::engine::TranspositionTable retained_table(4);
+    zfs::engine::Searcher retained_searcher(retained_table);
+    zfs::engine::SearchLimits limits;
+    limits.depth = 4;
+    limits.restrict_search_moves = true;
+    limits.search_moves.push_back(*restricted_move);
+    const std::atomic_bool stop{false};
+    const auto restricted =
+        retained_searcher.search(advanced, limits, {}, stop);
+    CHECK(restricted.has_move);
+    CHECK(restricted.best_move == *restricted_move);
+
+    limits.depth = 5;
+    limits.restrict_search_moves = false;
+    limits.search_moves.clear();
+    const auto retained =
+        retained_searcher.search(zfs::Game{}, limits, {}, stop);
+
+    zfs::engine::TranspositionTable fresh_table(4);
+    zfs::engine::Searcher fresh_searcher(fresh_table);
+    const auto fresh = fresh_searcher.search(zfs::Game{}, limits, {}, stop);
+    CHECK(retained.has_move && fresh.has_move);
+    CHECK(retained.best_move == fresh.best_move);
+    CHECK(retained.score == fresh.score);
+}
+
 void test_limit_normalization_and_tt_epoch() {
     zfs::Game game;
     zfs::engine::TranspositionTable table(1);
@@ -383,6 +436,7 @@ int main() {
     test_leader_initiative();
     test_automatic_draw_roots();
     test_limits_and_determinism();
+    test_restricted_root_does_not_pollute_transposition_table();
     test_limit_normalization_and_tt_epoch();
     test_search_path_twofold();
     test_null_move_pruning_is_exercised_and_guarded();

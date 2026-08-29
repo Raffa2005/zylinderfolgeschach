@@ -833,3 +833,19 @@ and their consequences, not the code line by line.
     proof, so no score-based early exit is added; the exact fixture instead
     guards that inactive follow remains ordinary move selection and that a
     non-mate depth-10 search completes all requested iterations.
+
+100. **Selective mate scores are verified at full width before stopping.**
+    Decision 98 called a completed root score exact, but the tree beneath that
+    root may contain null-move pruning and late-move reductions. A mate score
+    from that selective tree is therefore a claim, not yet a proof. Kugelfisch
+    now repeats that depth with both heuristics disabled and a separate TT score
+    domain; only a completed mate result from this verification stops iterative
+    deepening. The verification shares the caller's node, time, and stop limits,
+    and an interrupted attempt returns the last completed primary result.
+    Restricted `go searchmoves` roots also no longer write an exact score for a
+    partial move set into the ordinary TT domain. The corrected depth-nine
+    corpus searches 2,049,525 nodes rather than 1,806,539 (+13.45%) because two
+    apparent mates now receive real proofs; this is the measured cost of
+    restoring soundness, not a strength experiment. This decision supersedes
+    the proof premise of decision 98 while retaining its early return after an
+    actual proof.
