@@ -326,3 +326,13 @@ The independent timed and sealed holdout stages were skipped, and the original
 6 cp coefficient was restored. This rejects the broad coefficient change, not
 the more specific hypothesis that some pawn-follow geometries are strategically
 bad.
+
+## Mixed queen shadowing: rejected
+
+Counting bishop and rook followers as sustainably compatible with a queen
+leader looked geometrically plausible: the queen can keep moving on either
+component geometry. In practice it scored 47.66% over 32 fixed-node pairs
+(-16.30 Elo point, LOS 8.70%) and increased depth-nine nodes 0.20%. A likely
+reason is that the queen's ability to switch geometry breaks the persistent
+relationship that the multiplier is meant to value. The timed and holdout gates
+were skipped and queen-only sustainable shadowing was restored.
