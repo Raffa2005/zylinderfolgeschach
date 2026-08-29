@@ -315,3 +315,14 @@ published as a completed iteration. It reduced the depth-nine corpus from
 deterministic gain was modest and the signal negative, the timed and sealed
 holdout stages were skipped exactly as pre-registered. The implementation was
 removed completely.
+
+## Pawn follower burden 16: rejected
+
+The human observation that a pawn can become a harmful compelled follower did
+not justify a blanket larger immediate burden. Raising only the pawn coefficient
+from 6 to 16 centipawns scored 44.53% over 32 fixed-node pairs (-38.15 Elo
+point, LOS 4.96%). Depth-nine nodes increased 0.19% and wall time was flat.
+The independent timed and sealed holdout stages were skipped, and the original
+6 cp coefficient was restored. This rejects the broad coefficient change, not
+the more specific hypothesis that some pawn-follow geometries are strategically
+bad.
