@@ -849,3 +849,16 @@ and their consequences, not the code line by line.
     restoring soundness, not a strength experiment. This decision supersedes
     the proof premise of decision 98 while retaining its early return after an
     actual proof.
+
+101. **Search owns a small exact evaluation cache.** The leader/follower term
+    recomputes cylindrical attack geometry often enough that a per-search,
+    direct-mapped cache is worthwhile. Its 16,384 entries use the complete
+    64-bit base position key plus an explicit validity bit; index collisions
+    miss safely, while the same ordinary, synthetic-null, and full-width state
+    may share an entry because evaluation reads only placement and side to move.
+    The table is 256 KiB, heap-resident, single-threaded, and discarded after
+    each search. Fixed-depth nodes, score, moves, PVs, and signature remained
+    identical, while two interleaved measurements reduced median depth-nine
+    time from 541.5 to 522.5 ms (-3.51%) and from 541.5 to 525 ms (-3.05%).
+    Both a 30,000-node and an independent 100 ms 32-pair screen replayed all
+    games identically; this is an exact throughput promotion, not an Elo claim.

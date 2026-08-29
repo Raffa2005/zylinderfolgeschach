@@ -282,3 +282,23 @@ four-run medians were 540.5 ms and 457 ms respectively. The +13.45% node and
 +18.27% time cost is accepted as a correctness repair. A deterministic
 node-limit regression also proves that an interrupted verifier reports its work
 and preserves the last completed primary result.
+
+## Exact evaluation cache: accepted
+
+The leader/follower evaluator is substantially more expensive than material,
+and search revisits enough positions for a small exact cache to pay. A
+16,384-entry direct-mapped table stores the full 64-bit `base_key`, score, and
+an explicit validity bit. It is per search and adds exactly 256 KiB to the
+heap-resident buffers. The key contains everything the current evaluator reads;
+follow, en-passant, clocks, repetition context, and search domain do not affect
+the score. As with the engine TT, exactness assumes the existing 64-bit Zobrist
+collision model rather than claiming mathematical collision impossibility.
+
+The fixed-depth corpus remained bit-for-bit stable at 2,049,525 nodes and
+signature `46538be04f62ccdb`. Two independent four-run measurements reduced
+median time from 541.5 to 522.5 ms (-3.51%) and from 541.5 to 525 ms (-3.05%).
+At 30,000 nodes, all 64 paired games were identical. A separate 100 ms,
+32-pair pool was also identical, meaning the speedup did not cross an iterative
+depth boundary in that sample; no Elo is inferred. Full Release and ASan/UBSan
+tests passed, and a temporary instrumented sanitizer build recomputed every
+exercised cache hit and asserted score equality before the assertion was removed.

@@ -22,6 +22,8 @@ constexpr int kInfinity = 32000;
 constexpr int kMaximumPly = 128;
 constexpr int kMaximumQuiescencePlies = 8;
 constexpr int kStopCheckMask = 1023;
+constexpr std::size_t kEvaluationCacheSize = 1U << 14U;
+constexpr std::size_t kEvaluationCacheMask = kEvaluationCacheSize - 1U;
 constexpr std::uint64_t kNullContext = 0x452821e638d01377ULL;
 constexpr std::uint64_t kSyntheticScoreDomain = 0xbe5466cf34e90c6cULL;
 constexpr std::uint64_t kFullWidthScoreDomain = 0xd1b54a32d192ed03ULL;
@@ -83,6 +85,13 @@ constexpr std::uint64_t kFullWidthScoreDomain = 0xd1b54a32d192ed03ULL;
 }  // namespace
 
 struct Searcher::Buffers {
+    struct EvaluationEntry {
+        std::uint64_t key = 0;
+        int score = 0;
+        bool valid = false;
+    };
+    static_assert(sizeof(EvaluationEntry) == 16U);
+
     struct Transition {
         Move move{};
         Undo undo{};
@@ -97,6 +106,7 @@ struct Searcher::Buffers {
     std::array<std::uint8_t, kMaximumPly> pv_length{};
     std::array<std::array<Move, 2>, kMaximumPly> killers{};
     std::array<std::array<std::array<int, 64>, 64>, 2> history{};
+    std::array<EvaluationEntry, kEvaluationCacheSize> evaluation_cache{};
 };
 
 class Searcher::Implementation {
@@ -521,6 +531,19 @@ private:
         return (position_.occupied(side) & ~(pawns | king)) != 0;
     }
 
+    [[nodiscard]] int evaluate_cached() noexcept {
+        const std::uint64_t key = position_.base_key();
+        auto& entry =
+            buffers_->evaluation_cache[key & kEvaluationCacheMask];
+        if (entry.valid && entry.key == key) {
+            return entry.score;
+        }
+        entry.key = key;
+        entry.score = evaluate(position_);
+        entry.valid = true;
+        return entry.score;
+    }
+
     [[nodiscard]] int quiescence(int alpha, int beta, int ply, int qply,
                                  bool synthetic_path) {
         if (!visit_node(ply)) {
@@ -528,7 +551,7 @@ private:
         }
         buffers_->pv_length[ply] = 0;
         if (ply >= kMaximumPly - 1) {
-            return evaluate(position_);
+            return evaluate_cached();
         }
 
         if (!synthetic_path && is_search_repetition(ply)) {
@@ -547,12 +570,12 @@ private:
         const int qply_limit = std::clamp(limits_.quiescence_plies, 0,
                                           kMaximumQuiescencePlies);
         if (qply >= qply_limit) {
-            return evaluate(position_);
+            return evaluate_cached();
         }
 
         int best = -kInfinity;
         if (!move_info.all_moves_required) {
-            best = evaluate(position_);
+            best = evaluate_cached();
             if (best >= beta) {
                 return best;
             }
@@ -599,7 +622,7 @@ private:
         }
         buffers_->pv_length[ply] = 0;
         if (ply >= kMaximumPly - 1) {
-            return evaluate(position_);
+            return evaluate_cached();
         }
 
         if (!synthetic_path && is_search_repetition(ply)) {
@@ -646,7 +669,7 @@ private:
             !position_.in_check(position_.side_to_move()) &&
             !(valid_square(position_.follow_square()) &&
               moves[0].to() == position_.follow_square()) &&
-            evaluate(position_) >= beta) {
+            evaluate_cached() >= beta) {
             const int reduction = 2 + depth / 5;
             NullUndo undo;
             make_null_move(ply, undo);
