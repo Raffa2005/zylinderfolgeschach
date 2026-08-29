@@ -302,3 +302,16 @@ At 30,000 nodes, all 64 paired games were identical. A separate 100 ms,
 depth boundary in that sample; no Elo is inferred. Full Release and ASan/UBSan
 tests passed, and a temporary instrumented sanitizer build recomputed every
 exercised cache hit and asserted score equality before the assertion was removed.
+
+## Root aspiration window: rejected
+
+A single conservative +/-512 centipawn root window from depth five always
+re-searched the complete root with an unlimited window after fail-low or
+fail-high. Focused tests compared aspiration on and off, and no bound was ever
+published as a completed iteration. It reduced the depth-nine corpus from
+2,049,525 to 1,983,900 nodes (-3.20%) and median time from 522.5 to 503 ms
+(-3.73%). The fixed-node strength screen nevertheless scored 47.66% over
+32 pairs (-16.30 Elo point, wide and inconclusive interval). Because the
+deterministic gain was modest and the signal negative, the timed and sealed
+holdout stages were skipped exactly as pre-registered. The implementation was
+removed completely.
