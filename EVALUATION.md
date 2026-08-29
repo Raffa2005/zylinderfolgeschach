@@ -54,6 +54,9 @@ The committed suites are:
 - `openings/screen-v1.txt`: routine development screening.
 - `openings/holdout-v1.txt`: a separate confirmation set; do not tune against it
   after every edit.
+- `openings/holdout-v3.txt`: the sealed 128-opening holdout for the third
+  research cycle. It was generated and fingerprinted before that cycle's
+  candidates and must not be used for tuning or routine screens.
 
 They are small deterministic bootstrap books, not claims about optimal ZFS
 opening play. The generator samples legal lines, then rejects terminal,
