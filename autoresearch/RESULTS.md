@@ -336,3 +336,13 @@ component geometry. In practice it scored 47.66% over 32 fixed-node pairs
 reason is that the queen's ability to switch geometry breaks the persistent
 relationship that the multiplier is meant to value. The timed and holdout gates
 were skipped and queen-only sustainable shadowing was restored.
+
+## Generic check-freedom bonus: rejected
+
+A +50 cp bonus for the side to move while in check attempted to value the
+checked king's temporary freedom and the new follow target at its origin. Both
+the 30,000-node and independent 100 ms samples replayed all 64 games identically.
+The cleaner second benchmark changed only 41 of roughly two million nodes while
+slowing median time from 521.5 to 529 ms (+1.44%). With no playing evidence to
+justify duplicating the existing checker-specific leader term, the generic
+bonus and its test were removed; the sealed holdout was not opened.
