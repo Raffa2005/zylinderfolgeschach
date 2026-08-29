@@ -346,3 +346,14 @@ The cleaner second benchmark changed only 41 of roughly two million nodes while
 slowing median time from 521.5 to 529 ms (+1.44%). With no playing evidence to
 justify duplicating the existing checker-specific leader term, the generic
 bonus and its test were removed; the sealed holdout was not opened.
+
+## Forced-follow quiescence tail: rejected at benchmark
+
+Quiescence normally stops after eight tactical plies even if the horizon lands
+inside an active compulsory-follow chain. Continuing only such follows to a
+hard twelve-ply cap looked like a variant-native way to resolve the sequence,
+and a focused test proved the path executed. The depth-nine corpus nevertheless
+grew from 2,049,525 to 3,343,652 nodes (+63.14%) and from 523 to 838 ms
+(+60.23%). This exceeded the pre-registered 15% resource ceiling, so no
+self-play or holdout was run. Any future version needs a much more selective
+trigger or an explicit path budget and corresponding TT semantics.
