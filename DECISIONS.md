@@ -862,3 +862,34 @@ and their consequences, not the code line by line.
     time from 541.5 to 522.5 ms (-3.51%) and from 541.5 to 525 ms (-3.05%).
     Both a 30,000-node and an independent 100 ms 32-pair screen replayed all
     games identically; this is an exact throughput promotion, not an Elo claim.
+
+102. **The board sets the layout of Play, Analysis, and game review.** The
+    charcoal/gold palette and circular mark remain the visual identity. Replay
+    controls sit below the board, with 44-pixel touch targets, and SAN is grouped
+    into numbered White/Black rows. The first move number and color come from
+    the position and history cursor, including arbitrary Black-to-move roots.
+    History has a fixed, independently scrolling area; engine information
+    updates do not rebuild an unchanged list. Phone boards depend on width,
+    not the changing browser toolbar height, and coordinate labels stay inside
+    the board. Analysis has a prominent White-perspective score and collapsible
+    position tools. Play continues to hide scores and lines; its thinking-ahead
+    state is presented as the human's turn.
+
+103. **Review opens the selected position in Analysis with its history.** A
+    game detail link includes its current ply. Analysis validates and loads the
+    full saved line, then navigates to that ply before starting its normal
+    depth-limited search. No history is replaced by a board-only FEN. Review
+    displays the saved result and termination above the board, supports flipping,
+    and remains available through the existing detail URL rewrites. The new
+    end-of-game Review link awaits the queued save before navigating. A new game
+    asks before leaving an unfinished one. These changes do not alter archive
+    access, data, or engine strength.
+
+104. **Browser cancellation accepts the platform's AbortError unchanged.**
+    Modern DOMException objects have a read-only name. Renaming the reason from
+    AbortController.abort() could throw while pausing or restarting analysis.
+    The client now passes existing AbortErrors through and wraps other reasons
+    in a new Error. The worker cancellation/recreation boundary is unchanged.
+    The real-browser suite exercises analysis cancellation and restart alongside
+    mobile play, promotion, follow markers, and the saved-game handoff. All game
+    API calls in that suite are intercepted before reaching the server.

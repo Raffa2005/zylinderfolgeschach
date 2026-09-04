@@ -178,6 +178,13 @@ starts a fresh search which stops at exactly the selected depth.
 Saved lines are replayed through the production WebAssembly rules core rather
 than trusted as diagrams.
 
+Play, Analysis, and game review share board-adjacent replay controls and a
+paired White/Black SAN move list. On phones, the board is sized from available
+width so browser chrome and engine updates cannot change its height. Game
+review shows the outcome above the board and can open the selected position
+in Analysis with the complete game history. Advanced position tools are
+collapsed until needed.
+
 The worker owns a 32 MiB TT, clears it between games, and retains it between
 moves. Normal completed searches reuse the worker. Because this build is
 deliberately non-threaded, cancellation terminates and recreates the worker;
@@ -191,6 +198,16 @@ service now supplies only static files and the saved-game database to the pages.
 `ZFS_VIEWER_PORT` changes the default port 4173.
 `ZFS_VIEWER_GAMES_PATH` changes the saved-game file. The service binds only to
 `127.0.0.1`.
+
+For the optional real-browser regression suite, install Playwright and its
+Chromium browser in your test environment, start the viewer, and run
+`node tests/viewer_browser_smoke.mjs` from the repository root. Set
+`ZFS_VIEWER_URL` to the viewer URL (the test defaults to port 4187).
+`ZFS_PLAYWRIGHT_MODULE` and `ZFS_CHROMIUM_PATH` can select existing installations.
+The suite checks phone, tablet, and desktop layouts, real WASM play and analysis,
+tap/drag stability, replay, resignation, promotion, and history-preserving
+analysis links. It intercepts every game API request, including saves, so it
+can safely validate a Pages deployment without adding test games to the archive.
 
 ## Deploy the viewer to Cloudflare
 

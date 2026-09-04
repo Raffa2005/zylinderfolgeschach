@@ -12,24 +12,23 @@
   <body data-page="analysis">
     <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><img class="brand-mark" src="/mark.svg" alt="" />Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games">Games</a><a href="/analysis" aria-current="page">Analysis</a></nav></div></header>
     <main class="site-shell page-main" id="main">
-      <div class="page-heading"><h1>Analysis</h1></div>
+      <div class="page-heading workspace-heading"><h1>Analysis</h1><span class="page-context">Kugelfisch</span></div>
       <p id="analysis-source" class="message" hidden></p>
       <div class="analysis-layout">
-        <div>
+        <div class="analysis-board-column">
+          <section class="position-card board-status" id="analysis-position-card"><div class="status-line"><span id="analysis-turn-dot" class="turn-dot"></span><div><strong id="analysis-status">Loading…</strong><span id="analysis-status-detail"></span></div></div></section>
           <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="analysis-board" class="board" role="application" aria-label="Analysis board"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
-          <div class="board-actions"><button id="analysis-flip" type="button">Flip board</button><button id="analysis-reset" type="button">Reset</button></div>
+          <div class="board-toolbar"><div class="replay-controls"><button id="analysis-start" type="button" aria-label="Go to start" title="Go to start">⇤</button><button id="analysis-back" type="button" aria-label="Previous move" title="Previous move (←)">‹</button><button id="analysis-forward" type="button" aria-label="Next move" title="Next move (→)">›</button><button id="analysis-end" type="button" aria-label="Go to last move" title="Go to last move">⇥</button></div><button id="analysis-flip" class="quiet-button" type="button">Flip board</button></div>
         </div>
         <aside class="analysis-console">
-          <section class="panel position-card" id="analysis-position-card"><div class="status-line"><span id="analysis-turn-dot" class="turn-dot"></span><div><strong id="analysis-status">Loading…</strong><span id="analysis-status-detail"></span></div></div></section>
           <section class="panel engine-panel">
-            <div class="panel-heading"><h2>Kugelfisch</h2></div>
-            <div class="analysis-controls"><select id="analysis-depth" aria-label="Analysis depth"><option value="8">Depth 8</option><option value="9" selected>Depth 9</option><option value="10">Depth 10</option><option value="12">Depth 12</option><option value="14">Depth 14</option></select><label class="engine-switch"><input id="analysis-toggle" type="checkbox" checked disabled /><span class="switch-track" aria-hidden="true"><span></span></span><span>Analysis</span></label></div>
-            <strong id="analysis-engine-status">Ready</strong>
-            <div class="engine-metrics"><span id="analysis-score">—</span><span id="analysis-depth-readout">Depth —</span><span id="analysis-nodes">— nodes</span></div>
-            <p id="analysis-pv" class="engine-pv">No line.</p>
+            <div class="panel-heading"><h2>Evaluation</h2><label class="engine-switch"><input id="analysis-toggle" type="checkbox" checked disabled /><span class="switch-track" aria-hidden="true"><span></span></span><span>Engine</span></label></div>
+            <div class="evaluation-summary"><div class="evaluation-value"><span id="analysis-score">—</span><span class="score-perspective">White's perspective</span></div><div class="analysis-controls"><select id="analysis-depth" aria-label="Analysis depth"><option value="8">Depth 8</option><option value="9" selected>Depth 9</option><option value="10">Depth 10</option><option value="12">Depth 12</option><option value="14">Depth 14</option></select></div></div>
+            <div class="engine-metrics"><strong id="analysis-engine-status">Ready</strong><span id="analysis-depth-readout">Depth —</span><span id="analysis-nodes">— nodes</span></div>
+            <p id="analysis-pv" class="engine-pv" aria-label="Engine principal variation">No line.</p>
           </section>
-          <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="analysis-ply-count" class="count">0 / 0</span></div><div id="analysis-history" class="history empty">No moves yet</div><div class="replay-controls"><button id="analysis-start" type="button">⇤</button><button id="analysis-back" type="button">←</button><button id="analysis-forward" type="button">→</button><button id="analysis-end" type="button">⇥</button></div></section>
-          <section class="panel"><div class="field"><label for="analysis-fen">ZFS-FEN</label><textarea id="analysis-fen" rows="3" spellcheck="false"></textarea></div><div class="compact-actions"><button id="analysis-load" class="primary" type="button">Load</button><button id="analysis-copy" type="button">Copy</button></div></section>
+          <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="analysis-ply-count" class="count">0 / 0</span></div><div class="history-heading" aria-hidden="true"><span>#</span><span>White</span><span>Black</span></div><div id="analysis-history" class="history empty">No moves yet</div></section>
+          <details class="panel position-tools"><summary>Position tools</summary><div class="field"><label for="analysis-fen">ZFS-FEN</label><textarea id="analysis-fen" rows="3" spellcheck="false"></textarea></div><div class="compact-actions"><button id="analysis-load" class="primary" type="button">Load position</button><button id="analysis-copy" type="button">Copy</button></div><button id="analysis-reset" class="quiet-button full-button" type="button">Reset to starting position</button></details>
           <p id="analysis-error" class="message error" role="alert"></p>
         </aside>
       </div>

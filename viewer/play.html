@@ -21,15 +21,15 @@
     <main id="main">
       <section class="site-shell page-main" id="setup-view">
         <div class="setup-layout">
-          <div class="setup-copy"><p class="eyebrow">Kugelfisch</p><h1>New game</h1></div>
+          <div class="setup-copy"><img class="setup-mark" src="/mark.svg" alt="" /><p class="eyebrow">Zylinderfolgeschach-Engine</p><h1>New game</h1><p class="setup-subtitle">You and Kugelfisch.</p></div>
           <form class="panel setup-card" id="setup-form">
-            <div class="panel-heading"><h2>Play</h2></div>
+            <div class="panel-heading"><h2>Your game</h2><span class="count">No clock</span></div>
             <fieldset>
               <legend>Side</legend>
               <div class="choice-grid">
-                <div class="choice"><input id="color-white" type="radio" name="color" value="white" /><label for="color-white">White</label></div>
-                <div class="choice"><input id="color-random" type="radio" name="color" value="random" checked /><label for="color-random">Random</label></div>
-                <div class="choice"><input id="color-black" type="radio" name="color" value="black" /><label for="color-black">Black</label></div>
+                <div class="choice"><input id="color-white" type="radio" name="color" value="white" /><label for="color-white"><span class="side-token white" aria-hidden="true"></span>White</label></div>
+                <div class="choice"><input id="color-random" type="radio" name="color" value="random" checked /><label for="color-random"><span class="side-token random" aria-hidden="true"></span>Random</label></div>
+                <div class="choice"><input id="color-black" type="radio" name="color" value="black" /><label for="color-black"><span class="side-token black" aria-hidden="true"></span>Black</label></div>
               </div>
             </fieldset>
             <div class="field">
@@ -44,21 +44,23 @@
       <section class="game-page" id="game-view" hidden>
         <div class="game-layout">
           <div class="game-column">
-            <div class="player-strip"><div><strong id="top-player">Kugelfisch</strong><span id="top-player-meta"></span></div><span id="top-player-state" class="side-state"></span></div>
-            <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="board" class="board" role="application" aria-label="Zylinderfolgeschach board"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
-            <div class="player-strip"><div><strong id="bottom-player">You</strong><span id="bottom-player-meta"></span></div><span id="bottom-player-state" class="side-state"></span></div>
-          </div>
-          <aside class="game-console">
-            <section class="panel position-card" id="position-card" aria-live="polite">
+            <section class="position-card board-status" id="position-card" aria-live="polite">
               <div class="status-line"><span id="turn-dot" class="turn-dot"></span><div><strong id="status">Loading…</strong><span id="status-detail"></span></div></div>
               <p id="engine-status" class="engine-status">Ready</p>
             </section>
+            <div class="player-strip"><div><strong id="top-player">Kugelfisch</strong><span id="top-player-meta"></span></div><span id="top-player-state" class="side-state"></span></div>
+            <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="board" class="board" role="application" aria-label="Zylinderfolgeschach board"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
+            <div class="player-strip"><div><strong id="bottom-player">You</strong><span id="bottom-player-meta"></span></div><span id="bottom-player-state" class="side-state"></span></div>
+            <div class="board-toolbar"><div class="replay-controls"><button id="start-position" type="button" aria-label="Go to start" title="Go to start">⇤</button><button id="back" type="button" aria-label="Previous move" title="Previous move (←)">‹</button><button id="forward" type="button" aria-label="Next move" title="Next move (→)">›</button><button id="live-position" type="button" aria-label="Go to live position" title="Go to live position">⇥</button></div><button id="flip" class="quiet-button" type="button">Flip board</button></div>
+          </div>
+          <aside class="game-console">
             <section class="panel move-section">
               <div class="panel-heading"><h2>Moves</h2><span id="ply-count" class="count">0 / 0</span></div>
+              <div class="history-heading" aria-hidden="true"><span>#</span><span>White</span><span>Black</span></div>
               <div id="history" class="history empty">No moves yet</div>
-              <div class="replay-controls"><button id="start-position" type="button" aria-label="Go to start">⇤</button><button id="back" type="button" aria-label="Previous move">←</button><button id="forward" type="button" aria-label="Next move">→</button><button id="live-position" type="button" aria-label="Go to live position">⇥</button></div>
             </section>
-            <div class="game-actions"><button id="new-game" class="primary" type="button">New game</button><button id="resign" class="danger" type="button">Resign</button><button id="flip" type="button">Flip board</button></div>
+            <a id="review-game" class="button primary" href="/games" hidden>Review game <span aria-hidden="true">↗</span></a>
+            <div class="game-actions"><button id="new-game" type="button">New game</button><button id="resign" class="danger" type="button">Resign</button></div>
             <p id="error" class="message error" role="alert"></p>
           </aside>
         </div>

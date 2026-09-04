@@ -1,5 +1,6 @@
 function abortError(reason = 'engine search cancelled') {
-  const error = reason instanceof Error ? reason : new Error(String(reason));
+  if (reason?.name === 'AbortError') return reason;
+  const error = new Error(reason instanceof Error ? reason.message : String(reason));
   error.name = 'AbortError';
   return error;
 }

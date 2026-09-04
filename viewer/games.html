@@ -13,7 +13,7 @@
     <header class="site-header"><div class="site-shell header-inner"><a class="brand" href="/"><img class="brand-mark" src="/mark.svg" alt="" />Kugelfisch</a><nav class="site-nav" aria-label="Primary navigation"><a href="/play">Play</a><a href="/games" aria-current="page">Games</a><a href="/analysis">Analysis</a></nav></div></header>
     <main class="site-shell page-main" id="main">
       <section id="archive-view">
-        <div class="page-heading"><h1>Games</h1><a class="button primary" href="/play">New game</a></div>
+        <div class="page-heading"><div><p class="eyebrow">Public archive</p><h1>Games</h1></div><a class="button primary" href="/play">New game <span aria-hidden="true">↗</span></a></div>
         <p id="archive-loading" class="message">Loading games…</p>
         <div id="archive-grid" class="archive-grid" hidden></div>
         <div id="archive-empty" class="empty-state" hidden><p>No saved games.</p><a class="button primary" href="/play">Play</a></div>
@@ -21,16 +21,20 @@
         <div id="archive-pager" class="pager" hidden><button id="load-more" type="button">Load more</button></div>
       </section>
       <section id="detail-view" hidden>
-        <div class="page-heading"><h1 id="detail-heading">Game</h1><div class="heading-actions"><a id="analyze-game" class="button primary" href="/analysis">Analyze</a><a class="button" href="/games">All games</a></div></div>
+        <div class="page-heading workspace-heading"><h1 id="detail-heading">Game review</h1><a class="back-link" href="/games">‹ All games</a></div>
         <p id="detail-loading" class="message">Loading game…</p>
         <div id="detail-content" class="detail-layout" hidden>
-          <div class="panel replay-panel">
+          <div class="replay-panel">
+            <div class="replay-result"><strong id="detail-result" class="detail-result"></strong><span id="detail-outcome"></span></div>
+            <div class="player-strip"><div><strong id="replay-top-player"></strong><span id="replay-top-color">Black</span></div></div>
             <div class="board-frame"><span class="seam seam-left" aria-hidden="true">↔</span><div id="replay-board" class="board" role="application" aria-label="Saved game replay"></div><span class="seam seam-right" aria-hidden="true">↔</span></div>
-            <div class="replay-controls wide"><button id="replay-start" type="button">⇤</button><button id="replay-back" type="button">←</button><span id="replay-counter">0 / 0</span><button id="replay-forward" type="button">→</button><button id="replay-end" type="button">⇥</button></div>
+            <div class="player-strip"><div><strong id="replay-bottom-player"></strong><span id="replay-bottom-color">White</span></div></div>
+            <div class="board-toolbar"><div class="replay-controls wide"><button id="replay-start" type="button" aria-label="Go to start" title="Go to start">⇤</button><button id="replay-back" type="button" aria-label="Previous move" title="Previous move (←)">‹</button><span id="replay-counter">0 / 0</span><button id="replay-forward" type="button" aria-label="Next move" title="Next move (→)">›</button><button id="replay-end" type="button" aria-label="Go to last move" title="Go to last move">⇥</button></div><button id="replay-flip" class="quiet-button" type="button" aria-label="Flip board">Flip</button></div>
           </div>
           <aside class="side-stack">
-            <section class="panel"><strong id="detail-result" class="detail-result"></strong><div id="detail-players" class="detail-players"></div><div id="detail-meta" class="meta-list"></div></section>
-            <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="detail-ply-count" class="count"></span></div><div id="detail-moves" class="history"></div></section>
+            <section class="panel move-section"><div class="panel-heading"><h2>Moves</h2><span id="detail-ply-count" class="count"></span></div><div class="history-heading" aria-hidden="true"><span>#</span><span>White</span><span>Black</span></div><div id="detail-moves" class="history"></div></section>
+            <a id="analyze-game" class="button primary" href="/analysis">Analyze this position <span aria-hidden="true">↗</span></a>
+            <section class="panel game-info"><div class="panel-heading"><h2>Game details</h2></div><div id="detail-players" class="detail-players"></div><div id="detail-meta" class="meta-list"></div></section>
           </aside>
         </div>
         <p id="detail-error" class="message error" role="alert"></p>

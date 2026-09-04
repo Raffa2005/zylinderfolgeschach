@@ -77,8 +77,7 @@ function resignationText(humanColor) {
 
 function followText(state) {
   if (state.followForced) return `Follow ${state.follow}`;
-  if (state.follow !== '-') return `No legal move reaches ${state.follow}`;
-  return 'No follow field';
+  return 'Free to move';
 }
 
 function formatScore(score, turn) {
@@ -154,26 +153,56 @@ function boardUpdate(state, movable, orientation, engineMove) {
   };
 }
 
+const renderedHistories = new WeakMap();
+
 function renderMoveHistory(container, state, onSelect) {
+  // Iterative engine updates must not rebuild the list or disturb its focus.
+  const key = `${state.fen}|${state.historyCursor}|${state.history.join(' ')}`;
+  if (renderedHistories.get(container) === key) return;
+  renderedHistories.set(container, key);
   container.replaceChildren();
   container.classList.toggle('empty', state.history.length === 0);
   if (state.history.length === 0) {
     container.textContent = 'No moves yet';
     return;
   }
+  const fullmove = Number(state.fen.split(/\s+/)[5]);
+  const firstPly = (fullmove - 1) * 2 + (state.turn === 'black' ? 1 : 0) - state.historyCursor;
   let current;
+  let row;
   state.history.forEach((move, index) => {
+    const absolutePly = firstPly + index;
+    const black = absolutePly % 2 === 1;
+    const number = Math.floor(absolutePly / 2) + 1;
+    if (!row || !black) {
+      row = document.createElement('div');
+      row.className = 'history-row';
+      const label = document.createElement('span');
+      label.className = 'move-number';
+      label.textContent = `${number}.`;
+      row.append(label);
+      if (black) {
+        const empty = document.createElement('span');
+        empty.className = 'move-number';
+        empty.textContent = '…';
+        row.append(empty);
+      }
+      container.append(row);
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'history-move';
     if (index >= state.historyCursor) button.classList.add('future');
     if (index === state.historyCursor - 1) {
       button.classList.add('current');
+      button.setAttribute('aria-current', 'step');
       current = button;
     }
-    button.textContent = `${index + 1}. ${state.sanHistory?.[index] ?? move}`;
+    button.textContent = state.sanHistory?.[index] ?? move;
+    button.title = move;
+    button.setAttribute('aria-label', `${number}. ${black ? 'Black' : 'White'}: ${button.textContent}`);
     button.addEventListener('click', () => onSelect(index + 1));
-    container.append(button);
+    row.append(button);
   });
   if (!current) return;
   const top = current.offsetTop;
@@ -240,7 +269,7 @@ async function initializePlay() {
     positionCard: element('position-card'),
     promotionChoices: element('promotion-choices'), promotionDialog: element('promotion-dialog'),
     setupForm: element('setup-form'), setupMessage: element('setup-message'),
-    resign: element('resign'), setupView: element('setup-view'),
+    resign: element('resign'), review: element('review-game'), setupView: element('setup-view'),
     start: element('start-game'), startPosition: element('start-position'),
     status: element('status'), statusDetail: element('status-detail'),
     topMeta: element('top-player-meta'), topName: element('top-player'),
@@ -253,7 +282,7 @@ async function initializePlay() {
   let orientation = 'white';
   let inputLocked = false;
   let adjudication = null;
-  let saveChain = Promise.resolve();
+  let saveChain = Promise.resolve(false);
   const playingEngine = new PlayingEngine();
   const engine = {
     available: false, controller: null, createdAt: 0, depth: 9, enabled: false,
@@ -284,7 +313,7 @@ async function initializePlay() {
       else if (state.turn !== color) status.textContent = 'Waiting';
       else if (!human && engine.thinking) status.textContent = 'Thinking';
       else status.textContent = 'To move';
-      status.classList.toggle('active', state.turn === color);
+      status.classList.toggle('active', !adjudication && state.terminal === 'ongoing' && state.turn === color);
     };
     set(elements.topName, elements.topMeta, elements.topState, topColor);
     set(elements.bottomName, elements.bottomMeta, elements.bottomState, bottomColor);
@@ -295,7 +324,7 @@ async function initializePlay() {
     const reviewing = state.historyCursor !== state.history.length;
     const terminal = (adjudication || state.terminal !== 'ongoing') && !reviewing;
     elements.status.textContent = reviewing
-      ? `Move ${state.historyCursor} of ${state.history.length}`
+      ? 'Reviewing game'
       : adjudication === 'resignation'
         ? resignationText(engine.humanColor)
         : state.terminal === 'ongoing'
@@ -306,7 +335,7 @@ async function initializePlay() {
       : `${state.inCheck ? 'Check · ' : ''}${followText(state)}`;
     elements.positionCard.classList.toggle('terminal', terminal);
     elements.turnDot.className = `turn-dot ${state.turn}`;
-    elements.engineStatus.textContent = engine.message;
+    elements.engineStatus.textContent = engine.pondering ? 'Your move' : engine.message;
     elements.ply.textContent = `${state.historyCursor} / ${state.history.length}`;
     renderMoveHistory(elements.history, state, navigateTo);
     elements.startPosition.disabled = inputLocked || state.historyCursor === 0;
@@ -316,6 +345,8 @@ async function initializePlay() {
     elements.resign.disabled = inputLocked || Boolean(adjudication) ||
       state.terminal !== 'ongoing' || !engine.gameId ||
       state.historyCursor !== state.history.length;
+    elements.review.hidden = !terminal || !engine.gameId;
+    elements.review.href = `/games/${encodeURIComponent(engine.gameId ?? '')}`;
     renderPlayers();
   }
 
@@ -346,8 +377,10 @@ async function initializePlay() {
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload.error || `could not save game (HTTP ${response.status})`);
       }
+      return true;
     }).catch((error) => {
       elements.error.textContent = error instanceof Error ? error.message : String(error);
+      return false;
     });
   }
 
@@ -413,6 +446,8 @@ async function initializePlay() {
   }
 
   function returnToSetup() {
+    if (engine.enabled && state.terminal === 'ongoing' &&
+        !window.confirm('Leave this game and start a new one? Your moves are saved.')) return;
     stopGame('Ready');
     api.reset();
     state = readState();
@@ -516,6 +551,12 @@ async function initializePlay() {
 
   elements.setupForm.addEventListener('submit', beginGame);
   elements.newGame.addEventListener('click', returnToSetup);
+  elements.review.addEventListener('click', async (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const target = elements.review.href;
+    if (await saveChain) location.assign(target);
+  });
   elements.resign.addEventListener('click', () => {
     if (elements.resign.disabled || !window.confirm('Resign this game?')) return;
     adjudication = 'resignation';
@@ -556,6 +597,9 @@ async function initializeGames() {
     detailMoves: element('detail-moves'), detailPlayers: element('detail-players'),
     detailPly: element('detail-ply-count'), detailResult: element('detail-result'),
     detailView: element('detail-view'), loadMore: element('load-more'),
+    outcome: element('detail-outcome'), replayFlip: element('replay-flip'),
+    topPlayer: element('replay-top-player'), topColor: element('replay-top-color'),
+    bottomPlayer: element('replay-bottom-player'), bottomColor: element('replay-bottom-color'),
     replayBack: element('replay-back'), replayBoard: element('replay-board'),
     replayCounter: element('replay-counter'), replayEnd: element('replay-end'),
     replayForward: element('replay-forward'), replayStart: element('replay-start'),
@@ -564,6 +608,8 @@ async function initializeGames() {
   let loading = false;
   let state;
   let ground;
+  let savedGame;
+  let orientation = 'white';
 
   function resultLabel(game) {
     return game.status === 'completed' ? game.result : 'In progress';
@@ -589,7 +635,7 @@ async function initializeGames() {
     const black = document.createElement('span');
     black.textContent = game.black;
     const meta = document.createElement('small');
-    meta.textContent = `${game.plies} plies · depth ${game.depth}`;
+    meta.textContent = `${Math.ceil(game.plies / 2)} moves · Depth ${game.depth}`;
     details.append(white, black, meta);
     const body = document.createElement('div');
     body.className = 'archive-card-body';
@@ -631,7 +677,13 @@ async function initializeGames() {
   }
 
   function renderReplay() {
-    ground.set(boardUpdate(state, false, 'white'));
+    ground.set(boardUpdate(state, false, orientation));
+    const whiteBelow = orientation === 'white';
+    elements.topPlayer.textContent = whiteBelow ? savedGame.black : savedGame.white;
+    elements.bottomPlayer.textContent = whiteBelow ? savedGame.white : savedGame.black;
+    elements.topColor.textContent = whiteBelow ? 'Black' : 'White';
+    elements.bottomColor.textContent = whiteBelow ? 'White' : 'Black';
+    elements.analyze.href = `/analysis?game=${encodeURIComponent(gameId)}&ply=${state.historyCursor}`;
     elements.replayCounter.textContent = `${state.historyCursor} / ${state.history.length}`;
     elements.detailPly.textContent = `${state.historyCursor} / ${state.history.length}`;
     renderMoveHistory(elements.detailMoves, state, navigateReplay);
@@ -652,6 +704,7 @@ async function initializeGames() {
       const response = await fetch(`/api/games/${encodeURIComponent(gameId)}`, { cache: 'no-store' });
       if (!response.ok) throw new Error(`could not load game (HTTP ${response.status})`);
       const { game } = await response.json();
+      savedGame = game;
       if (!api.load(game.rootFen)) throw new Error(api.error());
       for (const move of game.moves) {
         if (!MOVE_PATTERN.test(move) || !api.play(move)) {
@@ -659,9 +712,13 @@ async function initializeGames() {
         }
       }
       state = readState();
-      ground = createBoard(elements.replayBoard, state);
-      elements.detailHeading.textContent = `${game.white} vs ${game.black}`;
+      elements.detailHeading.textContent = 'Game review';
       elements.detailResult.textContent = resultLabel(game);
+      const reasons = { resignation: 'Resignation', checkmate: 'Checkmate', threefold: 'Repetition', 'fifty-move': '50-move rule', stalemate: 'Stalemate' };
+      const outcome = game.result === '1-0' ? 'White wins' : game.result === '0-1' ? 'Black wins' : 'Draw';
+      elements.outcome.textContent = game.status === 'completed'
+        ? `${outcome} · ${reasons[game.termination] ?? game.termination}`
+        : 'Saved position';
       elements.detailPlayers.replaceChildren();
       for (const [name, color] of [[game.white, 'White'], [game.black, 'Black']]) {
         const row = document.createElement('span');
@@ -671,10 +728,10 @@ async function initializeGames() {
         row.append(side);
         elements.detailPlayers.append(row);
       }
-      elements.detailMeta.textContent = `${game.moves.length} plies · depth ${game.depth} · ${readableDate(game.updatedAt)}`;
-      elements.analyze.href = `/analysis?game=${encodeURIComponent(game.id)}`;
+      elements.detailMeta.textContent = `${Math.ceil(game.moves.length / 2)} moves · Depth ${game.depth} · ${readableDate(game.updatedAt)}`;
       elements.detailLoading.hidden = true;
       elements.detailContent.hidden = false;
+      ground = createBoard(elements.replayBoard, state);
       renderReplay();
     } catch (error) {
       elements.detailLoading.hidden = true;
@@ -687,6 +744,11 @@ async function initializeGames() {
   elements.replayBack.addEventListener('click', () => navigateReplay(state.historyCursor - 1));
   elements.replayForward.addEventListener('click', () => navigateReplay(state.historyCursor + 1));
   elements.replayEnd.addEventListener('click', () => navigateReplay(state.history.length));
+  elements.replayFlip.addEventListener('click', () => {
+    if (!ground) return;
+    orientation = orientation === 'white' ? 'black' : 'white';
+    renderReplay();
+  });
   document.addEventListener('keydown', (event) => {
     if (!gameId || !state || shouldIgnoreArrowKey(event)) return;
     const target = {
@@ -757,7 +819,7 @@ async function initializeAnalysis() {
     elements.positionCard.classList.toggle('terminal', terminal);
     elements.turnDot.className = `turn-dot ${state.turn}`;
     if (document.activeElement !== elements.fen) elements.fen.value = state.fen;
-    elements.engineStatus.textContent = message;
+    elements.engineStatus.textContent = terminal ? 'Game over' : message;
     elements.score.textContent = formatScore(analysis?.score, state.turn);
     elements.depthReadout.textContent = analysis?.depth === undefined ? 'Depth —' : `Depth ${analysis.depth}`;
     elements.nodes.textContent = analysis?.nodes === undefined ? '— nodes' : `${analysis.nodes.toLocaleString()} nodes`;
@@ -902,6 +964,12 @@ async function initializeAnalysis() {
       }
     }
     state = readState();
+    const requestedPly = new URLSearchParams(location.search).get('ply');
+    if (requestedPly !== null && /^\d+$/.test(requestedPly)) {
+      const cursor = Math.min(Number(requestedPly), state.history.length);
+      if (!navigateState(state, cursor)) throw new Error(api.error());
+      state = readState();
+    }
     elements.source.hidden = false;
     elements.source.replaceChildren();
     elements.source.append('Loaded ');
@@ -909,7 +977,7 @@ async function initializeAnalysis() {
     link.href = `/games/${encodeURIComponent(game.id)}`;
     link.textContent = `${game.white} vs ${game.black}`;
     elements.source.append(link, '.');
-    render();
+    restartAnalysis();
   }
 
   elements.toggle.addEventListener('change', () => {
